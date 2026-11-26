@@ -1970,3 +1970,8 @@ See [docs/mounts-improvements.md](docs/mounts-improvements.md) and [docs/perf-no
   1× frame path (1.07×–1.22× on 5-round alternating medians, byte-identical), two-step PNG CRC32 (1.06× on
   512×512 RGBA, byte-identical), and `SKILL.md` trimmed from 13,991 to 12,354 chars while documenting all new
   tools and APIs.
+- [x] **Token-economy CLI flags (`shot` `a+b` / `--cols N` / `--quiet`, `list --own --find`, `ascii --trim`, `build --quiet`)**:
+  single-process multi-row labelled contact sheets via `a+b` and `--cols N`, filtered line-range symbol maps
+  via `pxl list --own --find` (unwrapping top-level `{ ... }` lib scope blocks), tight transparent-margin
+  cropping with exact coordinates via `pxl ascii --trim`, and compact `--quiet` (`-q`) output on `build`
+  and `shot` that preserves all warnings and errors.

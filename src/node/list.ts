@@ -92,7 +92,20 @@ type Def = { kind: string; name: string; line: number; col: number };
 function mapFile(short: string, src: string, defs: Def[], header = ""): string[] {
   const lines = src.split("\n"), starts = [0];
   for (let i = 0; i < src.length; i++) if (src[i] === "\n") starts.push(i + 1);
-  const spans = src ? statements(src) : [];
+  const rawSpans = src ? statements(src) : [];
+  // unwrap top-level scope blocks (`{ ... }` used by lib files so their locals don't leak into includers)
+  const spans: [number, number][] = [];
+  for (const [a, b] of rawSpans) {
+    if (src[a] === "{") {
+      let end = b - 1;
+      while (end > a && /\s|;/.test(src[end])) end--;
+      if (src[end] === "}") {
+        for (const [ia, ib] of statements(src.slice(a + 1, end))) spans.push([a + 1 + ia, a + 1 + ib]);
+        continue;
+      }
+    }
+    spans.push([a, b]);
+  }
   const groups = new Map<number, Def[]>();
   for (const d of defs) {
     const off = (starts[d.line - 1] ?? 0) + d.col - 1, s = spans.findIndex(([a, b]) => off >= a && off < b);
@@ -124,33 +137,52 @@ function mapFile(short: string, src: string, defs: Def[], header = ""): string[]
   return [`${short} (${lines.length} lines${header})`, ...rows.sort((x, y) => x.from - y.from).map((r) => r.text)];
 }
 
-/** The map, one line per statement that defines something, under a line per file. */
-export function listProject(p: Project): string[] {
+export interface ListOpts { own?: boolean; find?: string }
+
+function filterFind(sections: { head: string; rows: string[] }[], extra: string[], find?: string): string[] {
+  const words = find ? find.toLowerCase().split(/\s+/).filter(Boolean) : [];
+  if (!words.length) return [...sections.flatMap((s) => [s.head, ...s.rows]), ...extra];
+  const has = (s: string) => { const l = s.toLowerCase(); return words.every((w) => l.includes(w)); };
   const out: string[] = [];
+  for (const s of sections) {
+    const matched = s.rows.filter((r) => has(r) || has(s.head + " " + r));
+    if (matched.length) out.push(s.head, ...matched);
+  }
+  for (const l of extra) if (has(l)) out.push(l);
+  return out.length ? out : [`(no matches for "${find}")`];
+}
+
+/** The map, one line per statement that defines something, under a line per file. */
+export function listProject(p: Project, opts?: ListOpts): string[] {
+  const sections: { head: string; rows: string[] }[] = [], extra: string[] = [];
   const byFile = new Map<string, Def[]>();
   for (const n of p.order) {
     const d = p.assets.get(n)!, m = /^(.*):(\d+):(\d+)$/.exec(d.top ?? d.loc ?? "");
     if (!m) continue;
     (byFile.get(m[1]) ?? byFile.set(m[1], []).get(m[1])!).push({ kind: d.kind, name: n, line: +m[2], col: +m[3] });
   }
-  for (const f of p.files) {
+  const files = opts?.own ? p.files.slice(0, 1) : p.files;
+  const ownShort = files.length ? p.short(files[0]) : "";
+  for (const f of files) {
     const short = p.short(f);
     if (!/\.px\.[jt]s$|\.[cm]?[jt]s$/.test(short)) continue;
     let src = "";
     try { src = readFileSync(f, "utf8"); } catch { /* listed without ranges */ }
-    out.push(...mapFile(short, src, byFile.get(short) ?? []));
+    const mapped = mapFile(short, src, byFile.get(short) ?? []);
+    sections.push({ head: mapped[0], rows: mapped.slice(1) });
   }
-  for (const g of p.groups.values()) out.push(`group ${g.name} ${g.loc ?? ""}  [${g.members.join(" ")}]`);
-  for (const s of p.sheets) out.push(`sheet ${s.name} ${s.loc ?? ""}`);
-  return out;
+  for (const g of p.groups.values()) if (!opts?.own || !g.loc || g.loc.startsWith(ownShort + ":")) extra.push(`group ${g.name} ${g.loc ?? ""}  [${g.members.join(" ")}]`);
+  for (const s of p.sheets) if (!opts?.own || !s.loc || s.loc.startsWith(ownShort + ":")) extra.push(`sheet ${s.name} ${s.loc ?? ""}`);
+  return filterFind(sections, extra, opts?.find);
 }
 
 /** A file that doesn't run on its own (one meant to be included): mapped from its text alone. */
-export function listText(path: string, why: string): string[] {
+export function listText(path: string, why: string, opts?: ListOpts): string[] {
   const src = readFileSync(path, "utf8"), defs: Def[] = [];
   for (const [a] of statements(src)) {
     const m = /^(sprite|anim|scene|rig|font|group|sheet)\s*\(\s*["'`]([^"'`]+)/.exec(src.slice(a, a + 200));
     if (m) defs.push({ kind: m[1], name: m[2], line: lineOf(src, a), col: a - src.lastIndexOf("\n", a - 1) });
   }
-  return mapFile(path.replace(/^.*[\\/]/, ""), src, defs, `; not run on its own (${why}): mapped from its text, so what loops make isn't named`);
+  const mapped = mapFile(path.replace(/^.*[\\/]/, ""), src, defs, `; not run on its own (${why}): mapped from its text, so what loops make isn't named`);
+  return filterFind([{ head: mapped[0], rows: mapped.slice(1) }], [], opts?.find);
 }

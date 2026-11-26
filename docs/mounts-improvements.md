@@ -141,3 +141,15 @@ All measurements below were taken via **5-round alternating benchmarks** (flippi
 - **`reference.md` ([reference.md](../reference.md)) & `types/pxl.d.ts` ([pxl.d.ts](../types/pxl.d.ts)):**
   - Documented `(c, fi)`, `frames`/`ms` validation, static-GIF warnings, duplicate-hex `swap` warnings, `rig3d.joints()`, `pxl shot <model.glb|model.obj>`, `pxl shot --sockets`, and `--profile` compiled SDF attribution.
   - All 5 automated checks in [docs.test.ts](../test/docs.test.ts) pass.
+
+---
+
+## Part 4 — Token-Economy & Contact-Sheet CLI Improvements
+
+Added after a quantitative analysis of the full session transcript (5,697 steps, 1,470 `read_file`s, 625 image loads, 117 multi-process `pxl shot` chains) to cut context/vision token burn without sacrificing visual or diagnostic quality:
+
+- **Single-process contact sheets (`pxl shot` `a+b` & `--cols N`)** ([cli.ts](../src/node/cli.ts), [shot.ts](../src/node/shot.ts)): joining names with `+` (`wolf_s+wolf_w horse_s+horse_w`) puts labelled cells side by side on each row (stripping only the sheet-wide shared prefix), and `--cols N` packs entries, glob members, or `--gif` clips into an `N`-column grid in one Node process and one PNG — replacing multi-process shot chains and reducing vision image loads by 3–6×.
+- **Filtered file symbol map (`pxl list --own --find <words>`)** ([list.ts](../src/node/list.ts), [cli.ts](../src/node/cli.ts)): unwraps top-level `{ ... }` scope blocks (used across `lib/*.px.js` such as `kit.px.js` and `mounts.px.js` so their internals stay visible to `pxl list`), adds `--own` to skip included files, and adds `--find` to filter statements, functions, consts, groups, and sheets to matching entries with exact line ranges — replacing broad `Select-String` dumps and 40 KB reads of multi-thousand-line `.px.js` files.
+- **Tight ASCII cropping (`pxl ascii --trim`)** ([render.ts](../src/core/render.ts), [cli.ts](../src/node/cli.ts)): crops transparent margins while preserving absolute canvas x/y rulers (`bounds: x,y wxh (of WxH)`), working on both color and `--parts` dumps.
+- **Compact output (`--quiet` / `-q` on `pxl build` and `pxl shot`)** ([cli.ts](../src/node/cli.ts)): suppresses non-warning asset/LOOK chatter while always keeping warnings, errors, static-GIF alerts, `--diff`, `--boxes`, `--sockets`, and `--profile` output intact.
+

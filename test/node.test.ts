@@ -1340,3 +1340,81 @@ test("profile: anonymous compiled SDF Function samples are attributed to src/cor
   assert.match(report, /60 ms.*\(compiled sdf\).*src\/core\/sdf\.ts \(generated\)/);
   assert.doesNotMatch(report, /readFileUtf8/);
 });
+
+test("cli token-economy flags: shot a+b / --cols / --quiet, ascii --trim, list --own --find, build --quiet", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-tok-"));
+  const inc = join(dir, "part.px.js");
+  const mainFile = join(dir, "main.px.js");
+  writeFileSync(inc, `pal({ k: "#141016", r: "#c83838", g: "#3c8c38", b: "#3868c8" })
+function helperFromInclude() { return 1 }
+sprite("inc_gem", { w: 4, h: 4 }, rect(1, 1, 2, 2, "g"))`);
+  writeFileSync(mainFile, `include("./part.px.js", { palette: true })
+{
+// wagon wheel builder
+function buildWheel() { return 42 }
+sprite("m_wolf_s", { w: 8, h: 8 }, rect(2, 3, 3, 3, "r"))
+sprite("m_wolf_w", { w: 8, h: 8 }, rect(1, 2, 4, 4, "r"))
+sprite("m_horse_s", { w: 8, h: 8 }, rect(2, 2, 4, 4, "b"))
+sprite("m_horse_w", { w: 8, h: 8 }, rect(1, 3, 5, 3, "b"))
+sprite("empty_pad", { w: 6, h: 6 })
+anim("static_a", { w: 4, h: 4, frames: 3, fps: 8 }, (c) => c.rect(1, 1, 2, 2, "g"))
+}`);
+  const run = async (argv: string[]) => {
+    const out: string[] = [], err: string[] = [], log = console.log, cerr = console.error;
+    console.log = (s: string) => out.push(String(s));
+    console.error = (s: string) => err.push(String(s));
+    try { const code = await main(argv); return { code, out: out.join("\n"), err: err.join("\n") }; }
+    finally { console.log = log; console.error = cerr; }
+  };
+
+  // 1. pxl list --own and --find
+  const lAll = await run(["list", mainFile]);
+  assert.equal(lAll.code, 0);
+  assert.match(lAll.out, /part\.px\.js/);
+  assert.match(lAll.out, /helperFromInclude/);
+  const lOwn = await run(["list", mainFile, "--own"]);
+  assert.equal(lOwn.code, 0);
+  assert.doesNotMatch(lOwn.out, /part\.px\.js/);
+  assert.match(lOwn.out, /buildWheel/);
+  const lFind = await run(["list", mainFile, "--own", "--find", "wagon", "wheel"]);
+  assert.equal(lFind.code, 0);
+  assert.match(lFind.out, /buildWheel/);
+  assert.doesNotMatch(lFind.out, /m_wolf_s/);
+  const lNone = await run(["list", mainFile, "--own", "--find", "nonexistent_xyz"]);
+  assert.match(lNone.out, /no matches/);
+
+  // 2. pxl ascii --trim (keeps absolute coordinates, crops empty margins, handles empty)
+  const aTrim = await run(["ascii", mainFile, "m_wolf_s", "--trim"]);
+  assert.equal(aTrim.code, 0);
+  assert.match(aTrim.out, /^bounds: 2,3 3x3 \(of 8x8\)/);
+  assert.match(aTrim.out, /\n  3 rrr\n  4 rrr\n  5 rrr$/);
+  const aEmpty = await run(["ascii", mainFile, "empty_pad", "--trim"]);
+  assert.equal(aEmpty.code, 0);
+  assert.match(aEmpty.out, /\(empty 6x6\)/);
+
+  // 3. pxl shot a+b multi-row labelled contact sheet (2 rows x 2 cols, shared prefix m_ stripped)
+  const packPng = join(dir, "pack.png");
+  const sPack = await run(["shot", mainFile, "m_wolf_s+m_wolf_w", "m_horse_s+m_horse_w", "--scale", "1", "--out", packPng]);
+  assert.equal(sPack.code, 0);
+  assert.ok(existsSync(packPng));
+  const pImg = decodePng(readFileSync(packPng));
+  // Each cell is max(8, labelWidth) wide and 8+7=15 tall; 2 stacked rows -> height 15 + 2 + 15 = 32
+  assert.equal(pImg.h, 32);
+  assert.ok(pImg.w > 16, `2 side-by-side labelled cells expected wider than 16, got ${pImg.w}`);
+
+  // 4. pxl shot --cols 2 packs 4 entries into a 2x2 labelled grid in one shot
+  const colsPng = join(dir, "cols.png");
+  const sCols = await run(["shot", mainFile, "m_wolf_s", "m_wolf_w", "m_horse_s", "m_horse_w", "--cols", "2", "--scale", "1", "--quiet", "--out", colsPng]);
+  assert.equal(sCols.code, 0);
+  const cImg = decodePng(readFileSync(colsPng));
+  assert.equal(cImg.h, 32);
+  assert.equal(cImg.w, pImg.w, "a+b c+d and a b c d --cols 2 produce identical 2x2 layout");
+  assert.equal(sCols.out.split("\n").length, 1, "--quiet prints a single compact path line when there are no warnings");
+
+  // 5. pxl build --quiet suppresses per-asset chatter while preserving static-GIF notes and summary
+  const bQuiet = await run(["build", mainFile, "--no-preview", "--quiet", "--out", join(dir, "out")]);
+  assert.equal(bQuiet.code, 0);
+  assert.doesNotMatch(bQuiet.out, /sprite m_wolf_s/);
+  assert.match(bQuiet.out, /static_a.*-- static: all 3 frames identical/);
+  assert.match(bQuiet.out, /-> .* \(6 written\)/);
+});

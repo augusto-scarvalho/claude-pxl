@@ -48,9 +48,9 @@ export function tiled(img: Img, nx: number, ny: number): Img {
 }
 
 /** Shared window + x/y ruler helper for ascii() and asciiParts(). */
-function asciiWindow(img: Img, opts?: { anchor?: boolean; at?: [number, number, number, number] }) {
+function asciiWindow(img: Img, opts?: { anchor?: boolean; trim?: boolean; at?: [number, number, number, number] }) {
   let x0 = 0, y0 = 0, x1 = img.w, y1 = img.h;
-  const b = opts?.anchor && !opts?.at ? img.bounds() : null;
+  const b = (opts?.anchor || opts?.trim) && !opts?.at ? img.bounds() : null;
   if (opts?.at) {
     x0 = Math.max(0, Math.min(img.w, opts.at[0]));
     y0 = Math.max(0, Math.min(img.h, opts.at[1]));
@@ -58,6 +58,8 @@ function asciiWindow(img: Img, opts?: { anchor?: boolean; at?: [number, number, 
     y1 = Math.max(y0, Math.min(img.h, opts.at[1] + opts.at[3]));
   } else if (b) {
     x0 = b.x; y0 = b.y; x1 = b.x + b.w; y1 = b.y + b.h;
+  } else if (opts?.trim && !opts?.anchor) {
+    return { x0: 0, y0: 0, x1: 0, y1: 0, ay: 0, header: [`(empty ${img.w}x${img.h})`] };
   }
   const ax = opts?.anchor && img.pivot ? Math.floor(img.pivot[0]) : 0, ay = opts?.anchor && img.pivot ? Math.floor(img.pivot[1]) : 0;
   const header: string[] = [];
@@ -71,6 +73,7 @@ function asciiWindow(img: Img, opts?: { anchor?: boolean; at?: [number, number, 
     if (xs.some((v) => Math.abs(v) >= 10)) header.push("    " + xs.map((v) => (Math.abs(v) >= 10 ? String(Math.floor(Math.abs(v) / 10) % 10) : " ")).join(""));
     header.push("    " + xs.map((v) => String(Math.abs(v) % 10)).join(""));
   } else {
+    if (opts?.trim && b) header.push(`bounds: ${b.x},${b.y} ${b.w}x${b.h} (of ${img.w}x${img.h})`);
     if (x1 > 100) header.push("    " + Array.from({ length: x1 - x0 }, (_, i) => { const x = x0 + i; return x % 100 === 0 || (i === 0 && x >= 100) ? String(Math.floor(x / 100) % 10) : " "; }).join(""));
     if (x1 > 10 || x0 > 0) header.push("    " + Array.from({ length: x1 - x0 }, (_, i) => { const x = x0 + i; return x % 10 === 0 || (i === 0 && x0 > 0 && x >= 10) ? String(Math.floor(x / 10) % 10) : " "; }).join(""));
     header.push("    " + Array.from({ length: x1 - x0 }, (_, i) => String((x0 + i) % 10)).join(""));
@@ -78,8 +81,8 @@ function asciiWindow(img: Img, opts?: { anchor?: boolean; at?: [number, number, 
   return { x0, y0, x1, y1, ay, header };
 }
 
-/** Text dump with x/y rulers; colors shown as palette keys ("." transparent), one the palette hasn't (a swap's) as a key said under it. With `anchor: true`, crops tightly to opaque bounds and numbers axes relative to the pivot. With `at`, crops to [x, y, w, h]. */
-export function ascii(img: Img, pal: Palette, swap?: Record<string, unknown>, opts?: { anchor?: boolean; at?: [number, number, number, number] }): string {
+/** Text dump with x/y rulers; colors shown as palette keys ("." transparent), one the palette hasn't (a swap's) as a key said under it. With `anchor: true`, crops tightly to opaque bounds and numbers axes relative to the pivot. With `trim: true`, crops tightly while keeping absolute canvas coordinates. With `at`, crops to [x, y, w, h]. */
+export function ascii(img: Img, pal: Palette, swap?: Record<string, unknown>, opts?: { anchor?: boolean; trim?: boolean; at?: [number, number, number, number] }): string {
   const { x0, y0, x1, y1, ay, header } = asciiWindow(img, opts);
   const rev = pal.reverse(), extra: string[] = [], drawn = new Set<Color>();
   for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) drawn.add(img.data[y * img.w + x]);
@@ -110,7 +113,7 @@ export function ascii(img: Img, pal: Palette, swap?: Record<string, unknown>, op
 const PART_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 /** Text dump of 3D part IDs (`img.parts`) with x/y rulers and per-part pixel counts ("." transparent, "#" opaque unparted/outline). */
-export function asciiParts(img: Img, opts?: { anchor?: boolean; at?: [number, number, number, number] }): string {
+export function asciiParts(img: Img, opts?: { anchor?: boolean; trim?: boolean; at?: [number, number, number, number] }): string {
   if (!img.parts) return `(no 3D part map on this ${img.w}x${img.h} image — parts are recorded by surface(), voxels(), volume(), splats(), decal(), rig3d() and turnaround())`;
   const { x0, y0, x1, y1, ay, header } = asciiWindow(img, opts);
   const { ids, names } = img.parts;

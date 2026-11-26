@@ -826,15 +826,15 @@ painting replay ends ("animate" toggle).
 ## CLI
 
 ```
-node <pxl>/bin/pxl.js shot <file> <name | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--boxes] [--sockets] [--gif [--every N]] [--world [--every N]] [--out DIR | FILE.png | FILE.gif]
-node <pxl>/bin/pxl.js shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR | FILE.png | FILE.gif]
-node <pxl>/bin/pxl.js shot <model.glb | model.obj> [--pitch N] [--dirs 1|4|5|8] [--size N] [--scale N] [--grey] [--out DIR | FILE.png]
+node <pxl>/bin/pxl.js shot <file> <name | a+b | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--cols N] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--boxes] [--sockets] [--gif [--every N]] [--world [--every N]] [--quiet | -q] [--out DIR | FILE.png | FILE.gif]
+node <pxl>/bin/pxl.js shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--cols N] [--scale N] [--grey] [--gif] [--quiet | -q] [--out DIR | FILE.png | FILE.gif]
+node <pxl>/bin/pxl.js shot <model.glb | model.obj> [--pitch N] [--dirs 1|4|5|8] [--size N] [--scale N] [--grey] [--quiet | -q] [--out DIR | FILE.png]
 node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings] [--fix] [--edges] [--profile]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
-node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--all] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world]
+node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--all] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world] [--quiet | -q]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
-node <pxl>/bin/pxl.js ascii <file> <name> [--frame N] [--anchor] [--parts] [--at x,y,w,h]
-node <pxl>/bin/pxl.js list  <file>
+node <pxl>/bin/pxl.js ascii <file> <name> [--frame N] [--trim] [--anchor] [--parts] [--at x,y,w,h]
+node <pxl>/bin/pxl.js list  <file> [--own] [--find words]
 node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--frame N] [--sheet] [--out DIR]
 node <pxl>/bin/pxl.js inspect <file> <scene> [--id x | --find words] [--frame N] [--json]
 node <pxl>/bin/pxl.js edit <file> <scene> <edits.json | '{ "op": ..., "target": "id", ... }'> [--frame N] [--dry] [--allow ids]
@@ -890,8 +890,11 @@ sees frame N, the frame one loop on; checked where it falls in the loop), so a s
 frames past its one are left out; a clip's, and an anim's that plays once, are left out and said: "it has 192 frames
 (0-191): 300, 500 left out", so a frame drawn one loop on is told from one left out by that line). A row's own frame
 instead of `--frames`: `clip.gif@82`, `name@3`, `other.px.js:name@3` (a GIF's frame beside a PNG of it). `--boxes` outlines each shown frame's boxes (`c.setBox`) 1 px inside their edges, a colour a kind (hit red, hurt blue, others yellow, green, magenta, orange as met), named in a line under the picture's; a box past the frame is clipped and said. `--sockets` marks each named socket (`sockets` / `c.setSocket`) with a compact coloured 5×5 crosshair (white centre pixel + dark diagonal halo for contrast) and prints a legend with coordinates (and warns on sockets outside the frame). Giving `shot` a 3D reference model (`.glb` or `.obj`) renders an orthographic turnaround sheet matching pxl's camera and heading conventions (`--dirs 1|4|5|8`, default 5 = `S, SW, W, NW, N`; `--pitch N`, default 20° down; `--size N`, default 160 px per cell; supports `--grey`, `--scale`, `--out FILE.png`), decoding embedded PNG (and JPEG/WebP via ffmpeg) textures and printing vertex/triangle/material counts plus `W × D × H` bounding ratios (`W/H`, `D/H`, `D/W`). A sheet's name shows the sheet as `build` packs it; a group's or a glob's (`car`, `"car_*"`)
-its members side by side (16 to a row), each labelled under it with what its name adds (`n`, `nne`,
-`ne`): a set of rotations or directions at once, its check on all of them. What is clear shows as a mid
+its members side by side (16 to a row, or `--cols N`), each labelled under it with what its name adds (`n`, `nne`,
+`ne`): a set of rotations or directions at once, its check on all of them. Join names with `+` (`wolf_s+wolf_w horse_s+horse_w`)
+to pack labelled cells side by side on each row in one process and one PNG (spaces start new rows; `--cols N` also packs plain
+entries or `--gif` clips into `N` columns). `--quiet` (`-q`) prints only the output path, warnings, and explicit `--diff`/`--boxes`/`--sockets`
+output (suppressing `LOOK` lines and non-warning notes). What is clear shows as a mid
 grey (#8c8c96), so a near-black line and a dark tyre read on it. Several names make a row each, one under the other (`other.px.js:name` takes another file's,
 and a picture or a clip from anywhere is a row too), and several `--at` a column each: two versions of
 a scene, one scene from two agents, three details of a big one. A clip (a GIF, a video, read as
@@ -918,13 +921,15 @@ names (see `expect:`), and says what it wrote.
 
 A `build` of a
 whole file with more than 12 assets prints how many of each kind it wrote; `--list` or `--only`
-print a line each (a smaller file prints them anyway). A `build` writes the file's own assets, sheets
+print a line each (a smaller file prints them anyway); `--quiet` (`-q`) prints only warnings,
+static-GIF notes, errors and the final summary (`-> DIR (N written)`). A `build` writes the file's own assets, sheets
 and scenes (what they use from its includes drawn in them), not what its includes define (a library's
 hundred sprites): `--only` names those, `--all` writes all of it, and says how many it left; a file of
 includes alone (a stub at an old path) writes theirs.
 
 `ascii` prints a color the palette hasn't (a
 swap's) as the key the swap gave it (else a free one), and lists those under the grid with their colors.
+`--trim` crops tightly to the opaque bounds while keeping absolute canvas coordinates (printing `bounds: x,y wxh (of WxH)` above the ruler); `--anchor` crops and shifts axes relative to the pivot.
 `--parts` prints the 3D part-ID map (`surface()`, `rig3d()`, `turnaround()`, including `base` + `swap` and `flip`
 variants: `.` clear, `#` unparted/outline, a character per part with pixel counts); `--at x,y,w,h` crops to that region.
 
@@ -942,8 +947,9 @@ more, it says to make them once, at the file's top or once a frame.
 
 `list` maps a file: each top-level statement that defines assets, each function and each const of
 5 lines or more, its line range, the comment above it and what it defines (a loop's or a helper's
-many assets on one line). A file that doesn't run on its own (one meant to be included) is mapped
-from its text, without the assets its loops make.
+many assets on one line). `--own` skips included files; `--find words` keeps only entries matching
+every word (across name, comment and file). A file that doesn't run on its own (one meant to be
+included) is mapped from its text, without the assets its loops make.
 
 `help` prints the rows that define a name in full (an op given by its signature in a code block, `sheet(name, ...)`
 under Assets: that line; written up in prose, `corners()` under Terrain tilesets: that paragraph, first; a method by

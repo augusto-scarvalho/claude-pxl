@@ -27,7 +27,7 @@ import { storeLines } from "./store.ts";
 const EDGE_RINGS: ["steps" | "doubled" | "tips" | "bridges" | "notches" | "gaps" | "corners", number][] = [["steps", 0xe8202aff], ["doubled", 0xff8c14ff], ["tips", 0xd020d0ff], ["bridges", 0xd020d0ff], ["notches", 0x10c8e0ff], ["gaps", 0xffe020ff], ["corners", 0x20c040ff]];
 import { edit, inspect } from "./edit.ts";
 import { setKnobInSource } from "../core/world3d.ts";
-import { type Boxes, type Sockets, cellRow, diffRow, frameCount, frameTime, greyRow, membersRow, otherVersion, pastLoop, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
+import { type Boxes, type Sockets, cellRow, commonPrefix, diffRow, frameCount, frameTime, greyRow, labelledCells, membersRow, otherVersion, pastLoop, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
 import { loadModel3d, renderModelTurnaround } from "./model3d.ts";
 import { help } from "./help.ts";
 import { libCard, libDraft, libList } from "./lib.ts";
@@ -62,7 +62,7 @@ const USAGE = `pxl — pixel-art DSL
       its own height at the px a meter; in the genre's tones and ink; a cell alone (side, topdown at 45 degrees, iso, hd2d):
       3 tones at 16-32 px. Built to out/_draft/ (or DIR): the ✎ draft to clean by hand, or ◐ to look
       at. A 2D entry is redrawn simpler at a new density, never drafted.
-  pxl build <art.px.js> [--out DIR] [--only a,b] [--all] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world]
+  pxl build <art.px.js> [--out DIR] [--only a,b] [--all] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world] [--quiet | -q]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
       previews (out/_preview; animated assets also get a .gif): the file's own assets, sheets and
       scenes (what they use from its includes drawn in them); what an included file defines only
@@ -71,7 +71,8 @@ const USAGE = `pxl — pixel-art DSL
       it moves), to post; a PNG past 16,777,216 px after the scale (4096x4096; an anim's PNG is its
       frames in one sheet) is not written, said in its line (the GIF is). A whole file of more than 12 assets
       prints a count of what it wrote; --only and --list print a line per asset (size, frames,
-      preview scale). --every N: preview GIFs keep one frame in N (a long loop's runs to many MB).
+      preview scale); --quiet (-q) prints only warnings, static-GIF notes, errors and the final summary.
+      --every N: preview GIFs keep one frame in N (a long loop's runs to many MB).
       --aseprite also writes each asset as <name>.aseprite (layers, frames, tag, palette) to keep
       editing in Aseprite; pxl never reads it back and the next --aseprite build overwrites it, so
       copy it out of out/. --profile: where the time went, read off the CPU profiler: the slowest
@@ -82,18 +83,21 @@ const USAGE = `pxl — pixel-art DSL
       magenta line) each frame.
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
       Live viewer: rebuilds on save and replays each asset's painting steps.
-  pxl ascii <art.px.js> <name> [--frame N] [--anchor] [--parts] [--at x,y,w,h]
+  pxl ascii <art.px.js> <name> [--frame N] [--trim] [--anchor] [--parts] [--at x,y,w,h]
       Print an asset as palette keys with x/y rulers (anims: every frame; --frame N: that one); a color
       the palette hasn't (a swap's) as the key the swap gave it, else a free one, said under the grid.
+      --trim crops tightly to the opaque bounds while keeping absolute canvas x/y coordinates.
       --anchor crops to the opaque bounds and numbers axes relative to the asset's pivot (ready for views() retouch / runs()).
       --parts prints the 3D part-ID map instead of colors ("." clear, "#" unparted/outline, a char per part with pixel counts).
       --at x,y,w,h crops to that region (for inspecting part of a sprite or scene).
-  pxl list  <art.px.js>
+  pxl list  <art.px.js> [--own] [--find words]
       A map of the file (and what it includes): each top-level statement that defines assets, each
       function and each const of 5 lines or more, its line range, the comment above it and what it
-      defines (a loop's many assets on one line); then groups and sheets. An included file is named by
-      its path from the file's folder (../nature/kit.px.js), as in errors. A file that doesn't run on
-      its own (one meant to be included) is mapped from its text. Read those lines, not the file.
+      defines (a loop's many assets on one line); then groups and sheets. --own maps only the named
+      file (skipping includes); --find words keeps only entries whose name, comment or file matches
+      every word. An included file is named by its path from the file's folder (../nature/kit.px.js),
+      as in errors. A file that doesn't run on its own (one meant to be included) is mapped from its
+      text. Read those lines, not the file.
   pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief] [--out DIR | --no-out]   (or: pxl describe <image.png> [...])
       A whole scene as text to read at once: what was painted (steps grouped by source line), what
       was placed where, cell maps (object on top, color before lighting, brightness after it), how
@@ -159,16 +163,19 @@ const USAGE = `pxl — pixel-art DSL
       what is placed by a relation to it moves too), searched without a model and written into the file
       where the number is (a computed one is said and left); it says each change, and the rules
       that held still hold (a scene's checked rebuilt before anything is written).
-  pxl shot <art.px.js> <name | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--boxes] [--sockets] [--gif [--every N]] [--world [--every N]] [--out DIR | FILE.png | FILE.gif]
-  pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR | FILE.png | FILE.gif]
-  pxl shot <model.glb | model.obj> [--pitch N] [--dirs 1|4|5|8] [--size N] [--scale N] [--grey] [--out DIR | FILE.png]
+  pxl shot <art.px.js> <name | a+b | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--cols N] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--boxes] [--sockets] [--gif [--every N]] [--world [--every N]] [--quiet | -q] [--out DIR | FILE.png | FILE.gif]
+  pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--cols N] [--scale N] [--grey] [--gif] [--quiet | -q] [--out DIR | FILE.png | FILE.gif]
+  pxl shot <model.glb | model.obj> [--pitch N] [--dirs 1|4|5|8] [--size N] [--scale N] [--grey] [--quiet | -q] [--out DIR | FILE.png]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0; an anim's
       past its loop too, at their own time: N, its frame count, is the frame one loop on; a clip's or an
       anim's that plays once past its end are said, "it has 4 frames (0-3): 6, 9 left out") cropped
       to the region, side by side (in rows when too wide for one: a contact sheet), enlarged,
       written to <out>/_shot/<name>.png (or straight to FILE.png / FILE.gif when --out ends in .png/.gif); clear shows as a mid grey. A sheet: as the build packs it; a
       group or a glob ("car_*"): its members side by side, each labelled with what its name adds (n,
-      nne, ne...), checked together. --vs puts the same
+      nne, ne...), checked together. Join names with "+" (a+b+c) to put labelled cells side by side
+      on one row (spaces start new rows: wolf_s+wolf_w horse_s+horse_w); --cols N wraps entries,
+      glob members or --gif cells into N columns per row. --quiet (-q) prints only the path, warnings
+      and explicit --diff/--boxes/--sockets output (omitting LOOK lines and non-warning notes). --vs puts the same
       shot of another version above it (at a git revision, the file and what it includes as they
       were there); --diff adds a row with the pixels that changed in red and says per frame how many
       and where (without --vs: between exactly two rows of one size, a frozen cell and its live
@@ -276,9 +283,13 @@ interface Args {
   dirs?: number;
   size?: number;
   brief?: boolean;
+  trim?: boolean;
   anchor?: boolean;
   parts?: boolean;
   pixels?: boolean;
+  own?: boolean;
+  quiet?: boolean;
+  cols?: number;
   sheet?: boolean;
   shrink?: number;
   offset?: [number, number];
@@ -358,9 +369,17 @@ function parse(argv: string[]): Args {
     else if (v === "--dirs") a.dirs = Number(val());
     else if (v === "--size") a.size = Number(val());
     else if (v === "--brief") a.brief = true;
+    else if (v === "--trim") a.trim = true;
     else if (v === "--anchor") a.anchor = true;
     else if (v === "--parts") a.parts = true;
     else if (v === "--pixels") a.pixels = true;
+    else if (v === "--own") a.own = true;
+    else if (v === "--quiet" || v === "-q") a.quiet = true;
+    else if (v === "--cols") {
+      const n = Number(val());
+      if (!Number.isInteger(n) || n < 1) throw new PxError(`--cols must be a whole number >= 1, got ${argv[i]}`);
+      a.cols = n;
+    }
     else if (v === "--check") a.check = val();
     else if (v === "--frame") a.frame = Number(val());
     else if (v === "--frames") { const f = val().trim(); if (f === "all") a.allFrames = true; else a.frames = framesFrom(f); }
@@ -448,7 +467,9 @@ export async function main(argv: string[]): Promise<number> {
         let report = "";
         const { p, r } = a.profile ? await profiled(build).then(({ result, profile, left }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times, left, result.p.offWhy, result.p.made); return result; }) : build();
         for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);
-        if (a.only || a.list || r.lines.length <= 12) for (const l of r.lines) console.log(l);
+        if (a.quiet) {
+          for (const l of r.lines) if (/ -- static:/.test(l)) console.log(l);
+        } else if (a.only || a.list || r.lines.length <= 12) for (const l of r.lines) console.log(l);
         else {
           // a whole file: what it wrote, counted (a rig file makes hundreds of parts and poses), and
           // the lines that carry a note
@@ -457,10 +478,11 @@ export async function main(argv: string[]): Promise<number> {
           for (const l of r.lines) if (/ -- |\(tiled: /.test(l)) console.log(l);
           console.log(`${r.lines.length} written: ${[...kinds].map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(", ")} (--list: one line each)`);
         }
-        if (r.left) console.log(`(${r.left} defined by its includes not written: --only names them, --all writes them)`);
+        if (!a.quiet && r.left) console.log(`(${r.left} defined by its includes not written: --only names them, --all writes them)`);
         for (const e of r.errors) console.error("error: " + e.message);
         if (report) console.log(report);
-        console.log(`-> ${outDir}${r.errors.length ? ` (${r.errors.length} error${r.errors.length > 1 ? "s" : ""})` : ""}`);
+        const tail = a.quiet ? ` (${r.lines.length} written${r.errors.length ? `, ${r.errors.length} error${r.errors.length > 1 ? "s" : ""}` : ""})` : r.errors.length ? ` (${r.errors.length} error${r.errors.length > 1 ? "s" : ""})` : "";
+        console.log(`-> ${outDir}${tail}`);
         return r.errors.length ? 1 : 0;
       }
       case "ascii": {
@@ -469,7 +491,7 @@ export async function main(argv: string[]): Promise<number> {
         if (a.at && a.at.length !== 4) throw new PxError("ascii --at needs a region x,y,w,h (e.g. --at 0,10,20,24)");
         const p = loadProject(file);
         const pal = p.assets.get(name)?.pal ?? p.pal, swap: Record<string, unknown> = {};
-        const ao = a.anchor || a.at ? { ...(a.anchor ? { anchor: true } : {}), ...(a.at ? { at: a.at as [number, number, number, number] } : {}) } : undefined;
+        const ao = a.anchor || a.trim || a.at ? { ...(a.anchor ? { anchor: true } : {}), ...(a.trim ? { trim: true } : {}), ...(a.at ? { at: a.at as [number, number, number, number] } : {}) } : undefined;
         // the swaps along its bases (a flip of a recolored walk): the keys they gave their colors
         for (let d = p.assets.get(name), i = 0; d && i < 8; d = typeof d.opts.base === "string" ? p.assets.get(d.opts.base) ?? p.assets.get((d.ns ?? "") + d.opts.base) : undefined, i++) Object.assign(swap, d.opts.swap, swap);
         const show = (img: Img) => (a.parts ? asciiParts(img, ao) : ascii(img, pal, swap, ao));
@@ -497,8 +519,9 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case "list": {
+        const lo = { own: a.own, find: a.find === undefined ? undefined : [a.find, ...a.rest].join(" ") };
         let lines: string[];
-        try { lines = listProject(loadProject(file)); } catch (e) { lines = listText(file, (e as Error).message.split("\n")[0]); }
+        try { lines = listProject(loadProject(file), lo); } catch (e) { lines = listText(file, (e as Error).message.split("\n")[0], lo); }
         for (const l of lines) console.log(l);
         return 0;
       }
@@ -697,19 +720,24 @@ export async function main(argv: string[]): Promise<number> {
           writePng(path, k > 1 ? sheet.scale(k) : sheet);
           const dx = model.max[0] - model.min[0], dy = model.max[1] - model.min[1], dz = model.max[2] - model.min[2];
           const fmt = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : "0.00");
-          console.log(`-> ${path} (3D turnaround: ${labels.join(", ")}; pitch ${pitch} deg, ${size}px${a.grey ? "; below: values" : ""}; ${k}x)`);
-          console.log(`${basename(file)}: ${model.vertices} vertices, ${model.triangles} triangles, ${Math.max(1, model.mats.length - 1)} material${model.mats.length - 1 === 1 ? "" : "s"}${model.textures ? ` (${model.textures} textured)` : ""}`);
-          console.log(`bounds (W x D x H): ${fmt(dx)} x ${fmt(dy)} x ${fmt(dz)}  (ratios: W/H=${fmt(dz ? dx / dz : 0)}, D/H=${fmt(dz ? dy / dz : 0)}, D/W=${fmt(dx ? dy / dx : 0)})`);
+          if (a.quiet) {
+            console.log(`-> ${path} (${labels.join(",")}; ${k}x; W/H=${fmt(dz ? dx / dz : 0)}, D/H=${fmt(dz ? dy / dz : 0)}, D/W=${fmt(dx ? dy / dx : 0)})`);
+          } else {
+            console.log(`-> ${path} (3D turnaround: ${labels.join(", ")}; pitch ${pitch} deg, ${size}px${a.grey ? "; below: values" : ""}; ${k}x)`);
+            console.log(`${basename(file)}: ${model.vertices} vertices, ${model.triangles} triangles, ${Math.max(1, model.mats.length - 1)} material${model.mats.length - 1 === 1 ? "" : "s"}${model.textures ? ` (${model.textures} textured)` : ""}`);
+            console.log(`bounds (W x D x H): ${fmt(dx)} x ${fmt(dy)} x ${fmt(dz)}  (ratios: W/H=${fmt(dz ? dx / dz : 0)}, D/H=${fmt(dz ? dy / dz : 0)}, D/W=${fmt(dx ? dy / dx : 0)})`);
+          }
           return 0;
         }
         // what to shoot: assets of this file, another's (`other.px.js:name`), or any picture or clip
         // (`a.png`, `ref.gif`, a JPEG, a video: a clip shows all its frames, drawn larger it is read at 1x)
-        // (a row's own frame: clip.gif@82, other.px.js:name@3)
+        // (a row's own frame: clip.gif@82, other.px.js:name@3; a+b joins labelled cells side by side on one row)
         const bare = (e: string) => e.replace(/@\d+$/, ""), png = MEDIA.test(bare(file)), entries = png ? [file, ...a.rest] : a.rest;
-        if (!entries.length) throw new PxError("shot needs an asset name: pxl shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs rev] [--diff]");
+        if (!entries.length) throw new PxError("shot needs an asset name: pxl shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b | a-b | all] [--at x,y,w,h ...] [--cols N] [--scale N] [--vs rev] [--diff]");
         if (a.ats.some((r) => r.length !== 4)) throw new PxError("shot --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
         if (a.diff && !a.vs && ((entries.length !== 2 && !(entries.length === 1 && !png && a.frames?.length === 2)) || a.ats.length > 1)) throw new PxError("shot --diff compares with another version (--vs <git rev | file>), two rows of one size (two names, name other.px.js:name or two PNGs, one region), or two frames of one asset (--frames 0,N: its loop's seam)");
         const regions = a.ats.length ? a.ats : [undefined];
+        const isPackExpr = (e: string) => e.includes("+") && !MEDIA.test(bare(e)) && !existsSync(resolve(bare(e)));
         // each name its own frames: all of its loop, or those asked for that it has (a still sprite in a
         // row of anims shows its one frame); an anim that loops has them past its loop too, drawn at their
         // time (N, its frame count: the frame one loop on, its seam), and checked where they fall in it
@@ -728,7 +756,75 @@ export async function main(argv: string[]): Promise<number> {
         const sockets: Sockets | undefined = a.sockets ? { kinds: new Map(), coords: new Map(), clipped: [] } : undefined;
         const socketLine = () => sockets && `sockets: ${sockets.kinds.size ? [...sockets.kinds].map(([k, c]) => { const cs = sockets.coords.get(k); return `${k} ${c}${cs?.size === 1 ? ` [${[...cs][0]}]` : ""}`; }).join(", ") : "none on these frames"}${sockets.clipped.length ? `; outside the frame: ${sockets.clipped.join("; ")}` : ""}`;
         const projects = new Map<string, Project>(), proj = (f: string) => projects.get(f) ?? projects.set(f, loadProject(f, { wholeWorld: a.world })).get(f)!;
-        const shots = entries.map((at): { png?: string; file?: string; name: string; img?: Img; names?: string[]; members?: boolean; own?: number[] } => {
+        const directOut = typeof a.out === "string" && (a.gif ? /\.gif$/i.test(a.out) : /\.png$/i.test(a.out)) ? resolve(a.out) : undefined;
+        // a+b side-by-side labelled rows, or --cols N packing multiple entries into one labelled contact sheet
+        const hasPack = entries.some(isPackExpr);
+        if (!a.gif && !a.world && (hasPack || (a.cols !== undefined && entries.length > 1))) {
+          if (a.vs || a.diff) throw new PxError("shot a+b / --cols packs labelled cells into one contact sheet (not for --vs or --diff)");
+          type PackCell = { img: Img; name: string; file?: string; checkNames?: string[] };
+          const expandCells = (items: string[]): PackCell[] => {
+            const out: PackCell[] = [];
+            for (const at of items) {
+              const e = bare(at), own = e !== at ? [Number(at.slice(e.length + 1))] : undefined;
+              if (MEDIA.test(e)) {
+                const m = readMedia(resolve(e)), want = own ?? a.frames;
+                const pick = (a.allFrames && !own) || (!want && m.frames.length > 1) ? m.frames.map((_, i) => i) : (want ?? [0]).filter((f) => f < m.frames.length);
+                if (!pick.length) throw new PxError(`${e}: it has ${m.frames.length} frame${m.frames.length === 1 ? "" : "s"} (0-${m.frames.length - 1})`);
+                out.push({ img: wrapRow(pick.map((f) => m.frames[f]), regions), name: basename(e).replace(MEDIA, "") });
+                continue;
+              }
+              const m = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(e), s = m ? { file: resolve(m[1]), name: m[2] } : { file, name: e };
+              const p = proj(s.file);
+              if (p.assets.has(s.name)) {
+                const frames = own ?? framesFor(p, s.name);
+                const img = frames.length > 1 || regions.length > 1
+                  ? wrapRow(frames.map((f) => shotFrame(p, s.name, f, a.ref, boxes, sockets)), regions)
+                  : a.at ? cellRow([shotFrame(p, s.name, frames[0], a.ref, boxes, sockets)], [a.at])
+                  : shotFrame(p, s.name, frames[0], a.ref, boxes, sockets);
+                out.push({ img, name: s.name, file: s.file, checkNames: [s.name] });
+                continue;
+              }
+              const sh = p.sheets.find((x) => x.name === s.name);
+              if (sh) { out.push({ img: packedSheet(p, sh).sheet, name: s.name, file: s.file, checkNames: p.sheetNames(sh) }); continue; }
+              if (p.groups.has(s.name) || s.name.includes("*")) {
+                const names = [...new Set(p.candidates(s.name))], f0 = own?.[0] ?? a.frames?.[0] ?? a.frame ?? 0;
+                for (const nm of names) {
+                  const raw = shotFrame(p, nm, Math.min(f0, frameCount(p, nm) - 1), a.ref, boxes, sockets);
+                  out.push({ img: a.at ? cellRow([raw], [a.at]) : raw, name: nm, file: s.file, checkNames: [nm] });
+                }
+                continue;
+              }
+              shotFrame(p, s.name, 0); // throws unknown asset cleanly
+            }
+            return out;
+          };
+          const rowGroups = hasPack ? entries.map((e) => expandCells(isPackExpr(e) ? e.split("+").filter(Boolean) : [e])) : [expandCells(entries)];
+          const allCells = rowGroups.flat();
+          const pre = commonPrefix(allCells.map((c) => c.name));
+          const cols = a.cols ?? 16;
+          const rows = rowGroups.map((grp) => labelledCells(grp.map((c) => ({ img: c.img, label: c.name.slice(pre.length) || c.name })), cols));
+          const sheet = a.grey ? stack([stack(rows), greyRow(stack(rows))]) : stack(rows);
+          const k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
+          const path = directOut ?? join(outDir, "_shot", allCells.map((c) => c.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".png");
+          writePng(path, sheet.scale(k));
+          if (a.quiet) console.log(`-> ${path} (${allCells.length} cells, ${k}x)`);
+          else console.log(`-> ${path} (${allCells.length} cells in ${rows.length} row${rows.length > 1 ? "s" : ""}${pre ? `, prefix "${pre}"` : ""}${a.grey ? "; below: values" : ""}; ${k}x)`);
+          if (boxes) console.log(boxLine());
+          if (sockets) console.log(socketLine());
+          const byFile = new Map<string, Set<string>>();
+          for (const c of allCells) if (c.file && c.checkNames) {
+            const set = byFile.get(c.file) ?? byFile.set(c.file, new Set()).get(c.file)!;
+            for (const nm of c.checkNames) set.add(nm);
+          }
+          for (const [f, set] of byFile) {
+            const r = checkProject(proj(f), { names: [...set] });
+            for (const l of (a.quiet ? r.lines : [...r.lines, ...r.notes])) console.log(l);
+            if (r.warnings) console.log(`${r.warnings} warning${r.warnings > 1 ? "s" : ""}; ${r.coverage}`);
+          }
+          return 0;
+        }
+        const flatEntries = a.gif ? entries.flatMap((e) => (isPackExpr(e) ? e.split("+").filter(Boolean) : [e])) : entries;
+        const shots = flatEntries.map((at): { png?: string; file?: string; name: string; img?: Img; names?: string[]; members?: boolean; own?: number[] } => {
           const e = bare(at), own = e !== at ? [Number(at.slice(e.length + 1))] : undefined;
           if (MEDIA.test(e)) return { png: resolve(e), name: basename(e).replace(MEDIA, ""), own };
           const m = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(e), s = m ? { file: resolve(m[1]), name: m[2], own } : { file, name: e, own };
@@ -739,10 +835,9 @@ export async function main(argv: string[]): Promise<number> {
           if (sh) return { ...s, img: packedSheet(p, sh).sheet, names: p.sheetNames(sh) };
           if (!(p.groups.has(s.name) || s.name.includes("*"))) return s;
           const names = [...new Set(p.candidates(s.name))];
-          return { ...s, img: membersRow(p, names, s.own?.[0] ?? a.frames?.[0] ?? a.frame ?? 0, a.ref, boxes, sockets), names, members: true };
+          return { ...s, img: membersRow(p, names, s.own?.[0] ?? a.frames?.[0] ?? a.frame ?? 0, a.ref, boxes, sockets, a.cols ?? 16), names, members: true };
         });
-        const directOut = typeof a.out === "string" && (a.gif ? /\.gif$/i.test(a.out) : /\.png$/i.test(a.out)) ? resolve(a.out) : undefined;
-        // --gif: the same things playing side by side (8 to a row), each its own loop on one clock as long
+        // --gif: the same things playing side by side (8 to a row, or --cols N), each its own loop on one clock as long
         // as the longest, a shorter one starting over; a cell per thing, its regions together in it
         if (a.gif) {
           if (a.vs) throw new PxError("shot --gif plays things side by side: --vs isn't for it (shoot the two versions as other.px.js:name)");
@@ -756,14 +851,15 @@ export async function main(argv: string[]): Promise<number> {
           const loops = clips.map((c) => c.ms.reduce((x, y) => x + y, 0)), T = Math.max(...loops);
           const cuts = [...new Set(clips.flatMap((c, i) => { const out: number[] = []; for (let s = 0; s < T; s += loops[i]) { let t = s; for (const m of c.ms) { if (t < T) out.push(t); t += m; } } return out; }))].sort((x, y) => x - y);
           const at = (i: number, t: number) => { let r = t % loops[i], f = 0; while (r >= clips[i].ms[f] && f < clips[i].ms.length - 1) r -= clips[i].ms[f++]; return f; };
-          const sheets = cuts.map((t) => wrapRow(clips.map((c, i) => cellRow([c.imgs[at(i, t)]], regions)), [undefined], 8));
+          const sheets = cuts.map((t) => wrapRow(clips.map((c, i) => cellRow([c.imgs[at(i, t)]], regions)), [undefined], a.cols ?? 8));
           const k = a.scale ?? Math.max(1, Math.min(8, Math.floor(1024 / Math.max(sheets[0].w, sheets[0].h))));
           const path = directOut ?? join(outDir, "_shot", shots.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".gif");
           mkdirSync(dirname(path), { recursive: true });
           let gifInfo: { frames: number; unique: number } | undefined;
           const gif = encodeGif(sheets.map((img, i) => ({ img, ms: (cuts[i + 1] ?? T) - cuts[i] })), { scale: k, onInfo: (info) => { gifInfo = info; } });
           writeAtomic(path, gif);
-          console.log(`-> ${path} (${(gif.length / 1e6).toFixed(1)} MB, ${cuts.length} frames, a loop of ${T} ms${new Set(loops).size > 1 ? `: ${loops.join(", ")} ms each, the shorter starting over` : ""}; across: ${shots.map((s) => s.name).join(", ")}; ${k}x)`);
+          if (a.quiet) console.log(`-> ${path} (${(gif.length / 1e6).toFixed(1)} MB, ${cuts.length}f, ${k}x)`);
+          else console.log(`-> ${path} (${(gif.length / 1e6).toFixed(1)} MB, ${cuts.length} frames, a loop of ${T} ms${new Set(loops).size > 1 ? `: ${loops.join(", ")} ms each, the shorter starting over` : ""}; across: ${shots.map((s) => s.name).join(", ")}; ${k}x)`);
           if (gifInfo && gifInfo.frames > 1 && gifInfo.unique === 1) console.log(`warning: all ${gifInfo.frames} frames are identical (static GIF)`);
           if (boxes) console.log(boxLine());
           if (sockets) console.log(socketLine());
@@ -819,16 +915,17 @@ export async function main(argv: string[]): Promise<number> {
           const span = (f: number[]) => (f.length > 2 && f.every((v, i) => v === f[0] + i) ? `${f[0]}-${f.at(-1)}` : f.join(","));
           const rowsFrames = many.filter((s) => "frames" in s).map((s) => [s.name, span((s as { frames: number[] }).frames)]);
           const sameFrames = new Set(rowsFrames.map((r) => r[1])).size <= 1;
-          console.log(`-> ${path} (${rowsFrames.length ? `frames ${sameFrames ? rowsFrames[0][1] : rowsFrames.map(([n, f]) => `${n} ${f}`).join(", ")}; ` : ""}rows, top down: ${shown.join(", ")}${a.diff ? "; below: what changed" : ""}${regions.length > 1 ? `; columns: ${a.ats.map((r) => r.join(",")).join(" | ")}` : ""}; ${k}x)`);
+          if (a.quiet) console.log(`-> ${path} (${k}x)`);
+          else console.log(`-> ${path} (${rowsFrames.length ? `frames ${sameFrames ? rowsFrames[0][1] : rowsFrames.map(([n, f]) => `${n} ${f}`).join(", ")}; ` : ""}rows, top down: ${shown.join(", ")}${a.diff ? "; below: what changed" : ""}${regions.length > 1 ? `; columns: ${a.ats.map((r) => r.join(",")).join(" | ")}` : ""}; ${k}x)`);
           if (boxes) console.log(boxLine());
           if (sockets) console.log(socketLine());
           if (changes) console.log(changes);
-          for (const s of many) if ("note" in s && s.note) console.log(s.note);
+          if (!a.quiet) for (const s of many) if ("note" in s && s.note) console.log(s.note);
           for (const s of many) {
             if (!("file" in s)) continue;
             const p = proj(s.file!), r = "img" in s ? checkProject(p, { names: s.names }) : checkProject(p, { names: [s.name], frames: looped(p, s.name, (s as { frames: number[] }).frames) });
-            for (const l of [...r.lines, ...r.notes]) console.log(l);
-            if (r.warnings || p.assets.get(s.name)?.kind === "scene" || p.rigs.has(s.name))
+            for (const l of (a.quiet ? r.lines : [...r.lines, ...r.notes])) console.log(l);
+            if (r.warnings || (!a.quiet && (p.assets.get(s.name)?.kind === "scene" || p.rigs.has(s.name))))
               console.log(`${s.name}: ${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
           }
           return 0;
@@ -857,7 +954,8 @@ export async function main(argv: string[]): Promise<number> {
         const sheet = stack(rows), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
         const base = directOut ? directOut.replace(/\.png$/i, "") : join(outDir, "_shot", name.replace(/[^\w.-]/g, "_")), path = directOut ?? base + ".png", last = join(outDir, "_shot", `${fileTag(file)}.${name.replace(/[^\w.-]/g, "_")}`);
         writePng(path, sheet.scale(k));
-        console.log(`-> ${path} (frames ${frames.join(",")}${a.vs ? `; above: ${a.vs}` : ""}${a.diff ? "; below: what changed" : ""}${a.grey ? "; at the bottom: its values, each pixel's lightness as a grey" : ""}; ${k}x)`);
+        if (a.quiet) console.log(`-> ${path} (${k}x)`);
+        else console.log(`-> ${path} (frames ${frames.join(",")}${a.vs ? `; above: ${a.vs}` : ""}${a.diff ? "; below: what changed" : ""}${a.grey ? "; at the bottom: its values, each pixel's lightness as a grey" : ""}; ${k}x)`);
         if (boxes) console.log(boxLine());
         if (sockets) console.log(socketLine());
         const left = own ? "" : pastOf(p, name);
@@ -865,32 +963,34 @@ export async function main(argv: string[]): Promise<number> {
         // against the last shot of the same frames and region: did the edit change anything, and where (skipped when --out names an exact PNG file)
         if (!directOut) {
           const key = JSON.stringify({ frames, at: a.at ?? null, ...(boxes ? { boxes: true } : {}), ...(sockets ? { sockets: true } : {}) });
-          if (existsSync(last + ".last.json") && readFileSync(last + ".last.json", "utf8") === key)
+          if (!a.quiet && existsSync(last + ".last.json") && readFileSync(last + ".last.json", "utf8") === key)
             console.log(`since the last shot: ${shotChanges(decodePng(readFileSync(last + ".last.png")), now, frames, a.at)}`);
           writePng(last + ".last.png", now);
           writeAtomic(last + ".last.json", key);
         }
         // what pxl check finds on it at these frames, so a look needs no other call
-        const r = checkProject(p, { names: [name], frames: looped(p, name, frames), edges: "shot" });
-        for (const l of [...r.lines, ...r.notes]) console.log(l);
+        const r = checkProject(p, { names: [name], frames: looped(p, name, frames), edges: a.quiet ? undefined : "shot" });
+        for (const l of (a.quiet ? r.lines : [...r.lines, ...r.notes])) console.log(l);
         // the faults the LOOK lines name, ringed on the asset: its lines' (corners orange, jaggies blue) and its edges';
         // the holes that opened, on the first frame shown that has one (else the first shown)
-        const lines = r.notes.some((l) => / LOOK: \d+ (L-corner|jagg)/.test(l)), edges = r.notes.some((l) => / LOOK: edges: /.test(l)), ells = r.notes.some((l) => / LOOK: genre '[^']*': \d+ L-corner/.test(l)), rgaps = r.notes.some((l) => / LOOK: retouch broke /.test(l));
-        const open = r.notes.some((l) => / LOOK: holes: /.test(l)) ? newHoles(p.frames(name).map((f) => f.img)) : [], lf = frames.find((f) => open[f]?.px.length) ?? frames[0], holes = !!open[lf]?.px.length;
-        if (lines || edges || ells || holes || rgaps) {
-          const img = p.assets.get(name)!.kind === "anim" ? (p.frames(name)[lf] ?? p.frames(name)[0]).img : p.image(name), s = Math.max(4, k), out = img.scale(s);
-          const ring = (x: number, y: number, c: Color) => { for (let i = 0; i < s; i++) for (let t = 0; t < (s >= 8 ? 2 : 1); t++) for (const [u, v] of [[i, t], [i, s - 1 - t], [t, i], [s - 1 - t, i]]) out.set(x * s + u, y * s + v, c); };
-          if (lines) { const f = lineFlaws(img); for (const [x, y] of f.corners) ring(x, y, pack(255, 140, 20)); for (const [x, y] of f.jaggies) ring(x, y, pack(40, 120, 255)); }
-          if (edges) { const f = edgeFlaws(img); for (const [kind, c] of EDGE_RINGS) for (const [x, y] of f[kind]) ring(x, y, c); }
-          // (the genre's line as its ink reads it: the figure without what its move paints, where the frame shows it)
-          if (ells) { const shown = img.figureImg && edgeFlaws(img).doubled.map(String); for (const [x, y] of edgeFlaws(img.figureImg ?? img).doubled) if (!shown || shown.includes(`${x},${y}`)) ring(x, y, pack(255, 140, 20)); }
-          if (holes) for (const i of open[lf].px) ring(i % img.w, Math.floor(i / img.w), pack(150, 60, 255));
-          if (rgaps && img.retouchGaps) for (const [x, y] of img.retouchGaps) ring(x, y, pack(255, 224, 32));
-          const lookPath = base + "_look.png";
-          writePng(lookPath, out);
-          console.log(`-> ${lookPath} (the LOOK lines' pixels ringed, frame ${lf}: ${[lines && "L-corners orange, jaggies blue", edges && "edges: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners green", ells && "its genre's line: L-corners orange", holes && "holes that opened violet", rgaps && "retouch outline gaps yellow"].filter(Boolean).join("; ")})`);
+        if (!a.quiet) {
+          const lines = r.notes.some((l) => / LOOK: \d+ (L-corner|jagg)/.test(l)), edges = r.notes.some((l) => / LOOK: edges: /.test(l)), ells = r.notes.some((l) => / LOOK: genre '[^']*': \d+ L-corner/.test(l)), rgaps = r.notes.some((l) => / LOOK: retouch broke /.test(l));
+          const open = r.notes.some((l) => / LOOK: holes: /.test(l)) ? newHoles(p.frames(name).map((f) => f.img)) : [], lf = frames.find((f) => open[f]?.px.length) ?? frames[0], holes = !!open[lf]?.px.length;
+          if (lines || edges || ells || holes || rgaps) {
+            const img = p.assets.get(name)!.kind === "anim" ? (p.frames(name)[lf] ?? p.frames(name)[0]).img : p.image(name), s = Math.max(4, k), out = img.scale(s);
+            const ring = (x: number, y: number, c: Color) => { for (let i = 0; i < s; i++) for (let t = 0; t < (s >= 8 ? 2 : 1); t++) for (const [u, v] of [[i, t], [i, s - 1 - t], [t, i], [s - 1 - t, i]]) out.set(x * s + u, y * s + v, c); };
+            if (lines) { const f = lineFlaws(img); for (const [x, y] of f.corners) ring(x, y, pack(255, 140, 20)); for (const [x, y] of f.jaggies) ring(x, y, pack(40, 120, 255)); }
+            if (edges) { const f = edgeFlaws(img); for (const [kind, c] of EDGE_RINGS) for (const [x, y] of f[kind]) ring(x, y, c); }
+            // (the genre's line as its ink reads it: the figure without what its move paints, where the frame shows it)
+            if (ells) { const shown = img.figureImg && edgeFlaws(img).doubled.map(String); for (const [x, y] of edgeFlaws(img.figureImg ?? img).doubled) if (!shown || shown.includes(`${x},${y}`)) ring(x, y, pack(255, 140, 20)); }
+            if (holes) for (const i of open[lf].px) ring(i % img.w, Math.floor(i / img.w), pack(150, 60, 255));
+            if (rgaps && img.retouchGaps) for (const [x, y] of img.retouchGaps) ring(x, y, pack(255, 224, 32));
+            const lookPath = base + "_look.png";
+            writePng(lookPath, out);
+            console.log(`-> ${lookPath} (the LOOK lines' pixels ringed, frame ${lf}: ${[lines && "L-corners orange, jaggies blue", edges && "edges: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners green", ells && "its genre's line: L-corners orange", holes && "holes that opened violet", rgaps && "retouch outline gaps yellow"].filter(Boolean).join("; ")})`);
+          }
         }
-        if (r.warnings || p.assets.get(name)?.kind === "scene" || p.rigs.has(name))
+        if (r.warnings || (!a.quiet && (p.assets.get(name)?.kind === "scene" || p.rigs.has(name))))
           console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
         return 0;
       }

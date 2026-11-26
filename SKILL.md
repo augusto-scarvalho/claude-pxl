@@ -11,17 +11,21 @@ every command and flag.
 
 ## Workflow
 
-1. Start from the closest example or library entry ([below](#examples); `PXL list <file>` maps it so
-   you read only the lines you need) and the template. Given a reference: `PXL shot ref.gif` or
-   `PXL shot model.glb` (3D `.glb`/`.obj` orthographic turnaround + proportions; JPEG/WebP/video need
-   ffmpeg) shows it, and `PXL study ref.gif` reads what in pxl makes each part (`PXL help "characters 2"`).
+1. Start from the closest example or library entry ([below](#examples); `PXL list <file> --own --find <words>`
+   maps exact line ranges so you read only the lines you need, never whole multi-thousand-line files).
+   Given a reference: `PXL shot ref.gif` or `PXL shot model.glb` (3D `.glb`/`.obj` orthographic
+   turnaround + proportions; JPEG/WebP/video need ffmpeg) shows it, and `PXL study ref.gif` reads
+   what in pxl makes each part (`PXL help "characters 2"`).
 2. Look in one call: `PXL shot art.px.js <name>` builds just that asset to `out/_shot/<name>.png`
    (or straight to `--out FILE.png` / `FILE.gif`), reports what changed since the last shot, and prints
-   `check` warnings. Useful flags: `--frames 0,12,30`, `--at x,y,w,h`, multiple names (a row each),
-   a sheet/group/glob, `--gif`, `--grey` (values only), `--boxes`, `--sockets`. Exact pixels:
-   `PXL ascii art.px.js <name>` (`--anchor`, `--parts`, `--at x,y,w,h`). Scenes:
-   `PXL describe art.px.js <scene>` (`--brief` when busy) gives positions, gaps, cover, contrast and
-   motion as text — answer layout questions from it, not by eyeballing.
+   `check` warnings. Pack multiple views into **one** contact sheet PNG and one process instead of
+   separate shots: `a+b+c` joins labelled cells on one row (spaces start new rows), `--cols N` wraps
+   entries or globs into an N-column labelled grid, and `--quiet` (`-q`) trims non-warning chatter.
+   Other flags: `--frames 0,12,30`, `--at x,y,w,h`, a sheet/group/glob, `--gif`, `--grey`, `--boxes`,
+   `--sockets`. Exact pixels: `PXL ascii art.px.js <name>` (`--trim` crops empty margins keeping exact
+   coordinates; `--anchor`, `--parts`, `--at x,y,w,h`). Scenes: `PXL describe art.px.js <scene>`
+   (`--brief` when busy) gives positions, gaps, cover, contrast and motion as text — answer layout
+   questions from it, not by eyeballing.
 3. Fix everything one look showed in one turn (every turn re-reads the whole conversation). After the
    first write, edit in place rather than rewriting the file whole. `describe --diff` lists what moved
    or redrew; `shot --vs HEAD --diff` shows changed pixels; `PXL steps art.px.js <name> --at x,y`
@@ -32,8 +36,9 @@ every command and flag.
    without `--dry` (writes where the value lives and runs `check`; computed values are refused for
    manual edits — `PXL help "inspect and edit"`).
 5. `PXL build art.px.js` writes the file's own PNGs, sheets and GIFs to `out/` (an include's via
-   `--only a,b` or `--all`) and previews to `out/_preview/`. Use `--profile` when slow (shows
-   compiled SDF time and non-`pure()` fields: `PXL help pure`).
+   `--only a,b` or `--all`) and previews to `out/_preview/`. While iterating, use `--only`,
+   `--no-preview`, and `--quiet` (`-q`). Use `--profile` when slow (shows compiled SDF time and
+   non-`pure()` fields: `PXL help pure`).
 6. While iterating, `PXL check art.px.js <name>`. Before handing over, `PXL check art.px.js` checks
    every scene, rig and frame (`check: { every: N }` on long stories), plus `expect` / `expect3d`
    rules (`--fix`). Fix each warning or explain why it is meant; inspect LOOK lines (L-corners,
@@ -55,9 +60,9 @@ Show stages for approval: camera + ground blocks, props, then people; a new move
 
 ## Looking things up
 
-Read by section, never whole (early reads are paid every later turn). `PXL help` is the index;
-`PXL help <name>` prints an op's reference and uses; `PXL help "<guide> <numbers or words>"` prints
-those sections:
+Never `read_file` whole guides or `reference.md` to look up an option (early reads are paid every
+later turn). `PXL help` is the index; `PXL help <name>` prints an op's reference and uses;
+`PXL help "<guide> <numbers or words>"` prints only those sections:
 
 | Making | Read |
 |---|---|

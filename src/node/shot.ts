@@ -104,20 +104,38 @@ function socketed(img: Img, all: Record<string, [number, number]>, where: string
 }
 
 /**
- * A group's or a glob's members side by side, frame f of each (its last when it has fewer), each
- * labelled under it with what its name adds to the others' (n, nne, ne, ...: a turn's headings).
+ * Labelled cells laid out side by side (`cols` to a row, wrapped into stacked rows), each with its
+ * label drawn underneath and transparent pixels shown as flat mid grey.
  */
-export function membersRow(p: Project, names: string[], f: number, ref = false, boxes?: Boxes, sockets?: Sockets): Img {
-  let pre = names.length > 1 ? names.reduce((a, n) => { let i = 0; while (i < a.length && a[i] === n[i]) i++; return a.slice(0, i); }) : "";
-  pre = pre.slice(0, Math.max(pre.lastIndexOf("_"), pre.lastIndexOf(".")) + 1);
-  const cells = names.map((n) => {
-    const img = shotFrame(p, n, Math.min(f, frameCount(p, n) - 1), ref, boxes, sockets), label = n.slice(pre.length) || n, cell = new Img(Math.max(img.w, lineWidth(label)), img.h + 7).fill(GAP_C);
+export function labelledCells(items: { img: Img; label: string }[], cols = 16): Img {
+  const cells = items.map(({ img, label }) => {
+    const cell = new Img(Math.max(img.w, lineWidth(label)), img.h + 7).fill(GAP_C);
     for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) cell.data[y * cell.w + x] = img.data[y * img.w + x] === TRANSPARENT ? EMPTY : img.data[y * img.w + x];
     let x = 0;
     for (const ch of label) { glyph(ch).forEach((r, j) => [...r].forEach((v, i) => v === "#" && cell.set(x + i, img.h + 2 + j, LABEL))); x += glyph(ch)[0].length + 1; }
     return cell;
   });
-  return stack(Array.from({ length: Math.ceil(cells.length / 16) }, (_, r) => cellRow(cells.slice(r * 16, (r + 1) * 16), [undefined])));
+  const step = Math.max(1, cols);
+  return stack(Array.from({ length: Math.ceil(cells.length / step) }, (_, r) => cellRow(cells.slice(r * step, (r + 1) * step), [undefined])));
+}
+
+/** Shared prefix up to the last "_" or "." across a set of names ("" when only one name or none shared). */
+export function commonPrefix(names: string[]): string {
+  if (names.length <= 1) return "";
+  const pre = names.reduce((a, n) => { let i = 0; while (i < a.length && a[i] === n[i]) i++; return a.slice(0, i); });
+  return pre.slice(0, Math.max(pre.lastIndexOf("_"), pre.lastIndexOf(".")) + 1);
+}
+
+/**
+ * A group's or a glob's members side by side, frame f of each (its last when it has fewer), each
+ * labelled under it with what its name adds to the others' (n, nne, ne, ...: a turn's headings).
+ */
+export function membersRow(p: Project, names: string[], f: number, ref = false, boxes?: Boxes, sockets?: Sockets, cols = 16): Img {
+  const pre = commonPrefix(names);
+  return labelledCells(names.map((n) => ({
+    img: shotFrame(p, n, Math.min(f, frameCount(p, n) - 1), ref, boxes, sockets),
+    label: n.slice(pre.length) || n,
+  })), cols);
 }
 
 /**
