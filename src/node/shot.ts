@@ -1,8 +1,9 @@
 // pxl shot: frames of an asset, cropped, side by side, enlarged; under another version of the file
 // for a before/after, and the pixels that changed.
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, relative, resolve, sep } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { readMedia } from "./media.ts";
 import type { Project } from "../core/project.ts";
 import { Img } from "../core/image.ts";
 import { TRANSPARENT } from "../core/color.ts";
@@ -224,11 +225,15 @@ export function stack(rows: Img[]): Img {
 }
 
 /**
- * Another version of an art file to load: a path, or a git revision. At a revision the file and every
- * art file it includes are read as they were there (one the revision doesn't have, as it is now).
+ * Another version of an art file to load: a file path, a directory of built outputs, or a git revision.
+ * At a revision the file and every art file it includes are read as they were there (one the revision doesn't have, as it is now).
  */
-export function otherVersion(file: string, vs: string): { path: string; read?: (abs: string) => string } {
-  if (existsSync(resolve(vs))) return { path: resolve(vs) };
+export function otherVersion(file: string, vs: string): { path: string; dir?: string; read?: (abs: string) => string } {
+  const abs = resolve(vs);
+  if (existsSync(abs)) {
+    if (statSync(abs).isDirectory()) return { path: abs, dir: abs };
+    return { path: abs };
+  }
   let root = "", rel = "";
   const show = (r: string) => execFileSync("git", ["show", `${vs}:${r}`], { cwd: root, encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] });
   try {
@@ -236,13 +241,53 @@ export function otherVersion(file: string, vs: string): { path: string; read?: (
     rel = relative(root, file).split(sep).join("/");
     show(rel);
   } catch {
-    throw new PxError(`--vs ${vs}: not a file here, and git has no ${rel || basename(file)} at '${vs}'`);
+    throw new PxError(`--vs ${vs}: not a file or folder here, and git has no ${rel || basename(file)} at '${vs}'`);
   }
   return {
     path: file,
-    read: (abs) => {
-      const r = relative(root, abs).split(sep).join("/");
-      try { return show(r); } catch { return readFileSync(abs, "utf8"); }
+    read: (p) => {
+      const r = relative(root, p).split(sep).join("/");
+      try { return show(r); } catch { return readFileSync(p, "utf8"); }
     },
   };
+}
+
+/** Find a built asset's GIF or PNG inside an output directory (for `pxl shot --vs <dir>`). */
+export function findInDir(dir: string, name: string, preferGif = false): string {
+  const exts = preferGif ? [".gif", ".png"] : [".png", ".gif"];
+  const subs = ["", "anims", "scenes", "sprites", "_preview"];
+  for (const ext of exts) {
+    for (const sub of subs) {
+      const p = sub ? join(dir, sub, name + ext) : join(dir, name + ext);
+      if (existsSync(p)) return p;
+    }
+  }
+  throw new PxError(`--vs ${dir}: could not find '${name}.png' or '${name}.gif' in ${dir} (checked root, sprites/, anims/, scenes/, _preview/)`);
+}
+
+/** Read a built strip/GIF from a folder into a shot row matching `frames` and optional crop `at`. */
+export function shotRowFromDir(dir: string, name: string, frames: number[], at?: number[]): Img {
+  const p = findInDir(dir, name, frames.length > 1 || frames[0] > 0);
+  const m = readMedia(p);
+  let imgs = m.frames;
+  // If a horizontal strip PNG was found for a multi-frame anim, slice it if JSON exists alongside it
+  if (imgs.length === 1 && p.endsWith(".png")) {
+    const jsonPath = p.replace(/\.png$/i, ".json");
+    if (existsSync(jsonPath)) {
+      try {
+        const meta = JSON.parse(readFileSync(jsonPath, "utf8")) as { frames?: Record<string, { frame: { x: number; y: number; w: number; h: number } }> };
+        const entries = meta.frames ? Object.values(meta.frames) : [];
+        if (entries.length > 1) imgs = entries.map((e) => m.frames[0].sub(e.frame.x, e.frame.y, e.frame.w, e.frame.h));
+      } catch { /* fall back to single image */ }
+    }
+  }
+  const picked = frames.map((f) => imgs[Math.min(f, imgs.length - 1)]);
+  return cellRow(picked, [at]);
+}
+
+/** Read an animated clip (frames + ms) for `name` from a folder (for `pxl shot --gif --vs <dir>`). */
+export function clipFromDir(dir: string, name: string): { imgs: Img[]; ms: number[] } {
+  const p = findInDir(dir, name, true);
+  const m = readMedia(p);
+  return { imgs: m.frames, ms: m.ms };
 }

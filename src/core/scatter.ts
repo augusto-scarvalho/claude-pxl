@@ -9,7 +9,7 @@
 // at rest, then carried by its moves (at, rotate, scale, bend: a tree's sway), each fluttering on the
 // clock out of step.
 import { PxError } from "./errors.ts";
-import { type Clock, STILL, Sdf, type V3, compile, num, vec } from "./sdf.ts";
+import { type Clock, STILL, Sdf, type V3, compile, num, orientBasis, vec } from "./sdf.ts";
 import { slab } from "./surface.ts";
 import { Splats } from "./splats.ts";
 import { hash } from "./util.ts";
@@ -73,6 +73,14 @@ function moveFns(outer: Sdf[]): { carry: (clock: Clock) => (p: V3) => V3; back: 
       const off = (z: number) => (z > 0 ? (z * z) / 2 : 0);
       return [(p) => [p[0] + kx * off(p[2]), p[1] + ky * off(p[2]), p[2]], (p) => [p[0] - kx * off(p[2]), p[1] - ky * off(p[2]), p[2]]];
     }
+    if (n.op === "orient") {
+      const o = vec(n.o, clock, "orient"), u = vec(n.u, clock, "orient"), e = n.e !== undefined ? vec(n.e, clock, "orient") : undefined;
+      const [X, Y, Z] = orientBasis(u, e);
+      return [
+        (p) => [o[0] + p[0] * X[0] + p[1] * Y[0] + p[2] * Z[0], o[1] + p[0] * X[1] + p[1] * Y[1] + p[2] * Z[1], o[2] + p[0] * X[2] + p[1] * Y[2] + p[2] * Z[2]],
+        (p) => { const qx = p[0] - o[0], qy = p[1] - o[1], qz = p[2] - o[2]; return [qx * X[0] + qy * X[1] + qz * X[2], qx * Y[0] + qy * Y[1] + qz * Y[2], qx * Z[0] + qy * Z[1] + qz * Z[2]]; },
+      ];
+    }
     const r = n as unknown as { axis: number[]; deg: number }, ax = unit(vec(r.axis, clock, "rotate")), g = (num(r.deg, clock, "rotate") * Math.PI) / 180, [u, v, w] = ax, co = Math.cos(g), si = Math.sin(g), t = 1 - co;
     const M = [t * u * u + co, t * u * v - si * w, t * u * w + si * v, t * u * v + si * w, t * v * v + co, t * v * w - si * u, t * u * w - si * v, t * v * w + si * u, t * w * w + co];
     return [(p) => [M[0] * p[0] + M[1] * p[1] + M[2] * p[2], M[3] * p[0] + M[4] * p[1] + M[5] * p[2], M[6] * p[0] + M[7] * p[1] + M[8] * p[2]], (p) => [M[0] * p[0] + M[3] * p[1] + M[6] * p[2], M[1] * p[0] + M[4] * p[1] + M[7] * p[2], M[2] * p[0] + M[5] * p[1] + M[8] * p[2]]];
@@ -85,18 +93,18 @@ function moveFns(outer: Sdf[]): { carry: (clock: Clock) => (p: V3) => V3; back: 
 }
 
 /**
- * A field's moves at its root (at, rotate, scale, bend), peeled off: the form inside, and how a point on
+ * A field's moves at its root (at, rotate, scale, bend, orient), peeled off: the form inside, and how a point on
  * it is carried by them at a moment. What is scattered on the form at rest goes where the form goes.
  */
 export function peel(f: Sdf): { inner: Sdf; carry: (clock: Clock) => (p: V3) => V3; back: (clock: Clock) => (p: V3) => V3 } {
   const outer: Sdf[] = [];
   let s = f;
-  while (["at", "rotate", "scale", "bend"].includes(s.node.op)) { outer.push(s); s = (s.node as { of: Sdf }).of; }
+  while (["at", "rotate", "scale", "bend", "orient"].includes(s.node.op)) { outer.push(s); s = (s.node as { of: Sdf }).of; }
   return { inner: s, ...moveFns(outer) };
 }
 
 /**
- * Like `peel()`, but traverses through material/part/paint/when wrappers and the primary operand of
+ * Like `peel()`, but traverses through material/part/paint/when/grow wrappers and the primary operand of
  * `intersect`/`subtract` (e.g. a ground-clipping plane) so `decal()` still tracks animated moves
  * wrapped inside `.mat()`, `.part()`, `.paint()`, or `.intersect(sdf.plane(...))`.
  */
@@ -105,10 +113,10 @@ export function peelMoves(f: Sdf): { carry: (clock: Clock) => (p: V3) => V3; bac
   let s: Sdf | undefined = f;
   while (s) {
     const op = s.node.op;
-    if (op === "at" || op === "rotate" || op === "scale" || op === "bend") {
+    if (op === "at" || op === "rotate" || op === "scale" || op === "bend" || op === "orient") {
       outer.push(s);
       s = (s.node as { of: Sdf }).of;
-    } else if (op === "mat" || op === "part" || op === "paint" || op === "paintBy" || op === "when") {
+    } else if (op === "mat" || op === "part" || op === "paint" || op === "paintBy" || op === "when" || op === "grow") {
       s = (s.node as { of: Sdf }).of;
     } else if (op === "intersect" || op === "subtract") {
       s = (s.node as { of: Sdf[] }).of[0];

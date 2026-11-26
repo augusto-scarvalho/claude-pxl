@@ -433,3 +433,19 @@ test("emit keep, fbmLoop seamless advection, and organic flame style: 'plume'", 
   assert.ok(cols.size >= 3, `plume flame uses core-to-rim keys (${cols.size} colors)`);
   assert.match(failure(PALS + 'sprite("s", { w: 12, h: 12 }, flame(6, 10, 8, "wyor", { style: "laser" }))', "s").message, /style is "tongues" or "plume"/);
 });
+
+test("sway Wave B: pad expands canvas horizontally, profile customizes sway wave, lag delays top behind base", () => {
+  const mk = (fx: string, w = 9) => load(`sprite("t", { w: ${w}, h: 8, pivot: "bottom" }, rect(${Math.floor(w / 2)}, 0, 1, 8, "g"))
+anim("a", { base: "t", frames: 4, fps: 4 }, ${fx})`).frames("a");
+  const padded = mk('effect("sway", { amount: 2, lean: 1, power: 1, vary: 0, pad: true })', 5);
+  assert.ok(padded[0].img.w > 5, `pad: true grows width to prevent clipping (got ${padded[0].img.w})`);
+  assert.equal(padded[0].img.pivot?.[0], padded[0].img.w / 2, "pivot shifts cleanly with horizontal padding");
+  const numPad = mk('effect("sway", { amount: 2, lean: 1, power: 1, vary: 0, pad: 3 })', 5);
+  assert.equal(numPad[0].img.w, 11, "explicit numeric pad adds 2*pad columns");
+  const prof = mk('effect("sway", { amount: 3, lean: 0, power: 1, vary: 0, profile: (ph) => ph < 0.5 ? 1 : -1 })');
+  const col = (im: Img, y: number) => [...Array(im.w).keys()].find((x) => im.get(x, y) !== 0)!;
+  assert.ok(col(prof[0].img, 0) > col(prof[2].img, 0), "custom profile drives sway deflection");
+  const noLag = mk('effect("sway", { amount: 3, lean: 0, power: 1, vary: 0, lag: 0 })');
+  const withLag = mk('effect("sway", { amount: 3, lean: 0, power: 1, vary: 0, lag: 0.25 })');
+  assert.ok(!same(noLag[0].img, withLag[0].img), "lag shifts upper rows' phase relative to lower rows");
+});

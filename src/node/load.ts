@@ -212,6 +212,18 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
       throw new PxError(`cannot read '${abs}'`);
     }
   };
+  p.binHook = (path) => {
+    late();
+    const abs = near(path);
+    try {
+      const bytes = readFileSync(abs);
+      p.addFile(abs);
+      seen.set(abs, sha1(bytes));
+      return bytes;
+    } catch {
+      throw new PxError(`cannot read '${abs}'`);
+    }
+  };
   try { run(file); p.loaded(); } catch (e) { throw hiding(e, ctx, env); }
   loaded = true;
   warnHiding(p, ctx, env, codes);

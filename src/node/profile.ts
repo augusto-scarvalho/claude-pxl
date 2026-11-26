@@ -47,8 +47,8 @@ export async function profiled<T>(fn: () => T): Promise<{ result: T; profile: Cp
   }
 }
 
-/** The report: self time by function, the art files' first, then pxl's; `times`: ms per asset; `left`: the fields traced but not kept; `off`: why the disk was let go (Project.offWhy); `made`: builds made on this thread (Project.made). */
-export function profileReport(profile: CpuProfile, art: string[], times: [string, number][], left: Left[] = [], off?: string, made = 0, top = 10): string {
+/** The report: self time by function, the art files' first, then pxl's; `times`: ms per asset; `left`: the fields traced but not kept; `off`: why the disk was let go (Project.offWhy); `made`: builds made on this thread (Project.made); `fileWrites`: costliest files written. */
+export function profileReport(profile: CpuProfile, art: string[], times: [string, number][], left: Left[] = [], off?: string, made = 0, top = 10, fileWrites?: { file: string; bytes: number; ms: number }[]): string {
   const byId = new Map(profile.nodes.map((n) => [n.id, n]));
   const self = new Map<string, { ms: number; name: string; where: string; art: boolean }>();
   let total = 0;
@@ -76,8 +76,14 @@ export function profileReport(profile: CpuProfile, art: string[], times: [string
     .map((e) => `  ${fmt(e.ms)} ${pct(e.ms)}  ${e.name.padEnd(18)} ${e.where}`);
   const slow = [...times].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n, ms]) => `${n} ${fmt(ms).trim()}`).join(", ");
   const artRows = rows(true), pxlRows = rows(false);
+  const fmtSize = (b: number) => (b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : b >= 1024 ? `${(b / 1024).toFixed(0)} KB` : `${b} B`);
+  const slowFiles = fileWrites?.length
+    ? [...fileWrites].sort((a, b) => b.ms - a.ms).slice(0, 5).filter((f) => f.ms >= 5)
+        .map((f) => `${f.file} (${fmtSize(f.bytes)}, ${fmt(f.ms).trim()})`).join(", ")
+    : "";
   return [
     `profile: ${fmt(total).trim()} in all${slow ? `; slowest assets: ${slow}` : ""}`,
+    ...(slowFiles ? [`slowest files written: ${slowFiles}`] : []),
     `peak memory: ${Math.round(process.resourceUsage().maxRSS / 1024)} MB, the most this process held (its workers' too)`,
     `store: ${storeSaid.back} builds and traces read back on this thread, ${made} builds made on it`,
     threadsSaid(),

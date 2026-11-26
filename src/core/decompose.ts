@@ -51,11 +51,15 @@ export interface Piece {
   source?: [number, number]; strength?: number; tint?: Color;
   /** smears: the frames a shape swept by something fast shows in (its colors there for a moment only) */
   smears?: { frames: number[]; colors: Color[] };
+  /** whole-body float/bob offsets per frame relative to frame 0 (e.g. a floating ghost) */
+  float?: [number, number][];
+  /** translucent or additive moving body (e.g. ghost, hologram): blend mode, estimated opacity (0..1) and optional tint */
+  translucent?: { blend: "alpha" | "add"; opacity: number; tint?: Color };
 }
 
 type Blob = { x0: number; y0: number; x1: number; y1: number; n: number; cx: number; cy: number; pix: number[] };
-// (smear: the colors of a smear cut off it, stamp's)
-type Comp = Blob & { t: number; id: number; smear?: Color[] };
+// (smear: the colors of a smear cut off it, stamp's; split: separated from a merged multi-mover blob)
+type Comp = Blob & { t: number; id: number; smear?: Color[]; split?: boolean };
 
 export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: number; y: number; dx: number; dy: number }[] = [], subClip = false): { pieces: Piece[]; still: number; frames: number; relit: boolean; light: Relight } {
   const N = Math.min(frames.length, 400), F0 = frames.slice(0, N), W = F0[0].w, H = F0[0].h, WH = W * H;
@@ -169,10 +173,86 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
         if (o > 0 || d <= reach) pairs.push([o + 0.5 * (1 - Math.min(1, d / reach)), i, j, o]);
       });
     });
-    // two passing, one piece where both should be, bigger than either: neither takes it, both go on
-    const both = new Set<number>();
-    cs.forEach((c, j) => { const over = pairs.filter((q) => q[2] === j && q[3] > 0 && c.n >= 1.4 * live[q[1]].comps.at(-1)!.n); if (over.length >= 2) both.add(j); });
-    const tookF = new Set<number>(), tookC = new Set<number>(both);
+    // Two or more moving objects overlapping into one merged blob: split the merged blob pixels between
+    // the competing velocity-predicted tracks using predicted-box distance + appearance color histograms,
+    // so crossing traffic / overlapping movers keep continuous separate tracks instead of dropping frames.
+    const both = new Set<number>(), tookF = new Set<number>();
+    const splitCands = (j: number): number[] => {
+      const c = cs[j], hits: number[] = [];
+      for (let i = 0; i < live.length; i++) {
+        const f = live[i];
+        // Only established, actively translating tracks (not 1-2 frame dips or slow swaying foliage)
+        if (f.comps.length < 3 || Math.hypot(f.vx, f.vy) < 0.75) continue;
+        // Stop hallucinating splits if a track hasn't re-emerged cleanly for 4+ consecutive frames
+        let splitRun = 0;
+        for (let k = f.comps.length - 1; k >= 0 && f.comps[k].split; k--) splitRun++;
+        if (splitRun >= 4) continue;
+        const l = f.comps.at(-1)!, g = t - l.t;
+        if (g > 3) continue;
+        const w = l.x1 - l.x0 + 1, h = l.y1 - l.y0 + 1, x = l.x0 + f.vx * g, y = l.y0 + f.vy * g;
+        const ow = Math.max(0, Math.min(x + w, c.x1 + 1) - Math.max(x, c.x0)), oh = Math.max(0, Math.min(y + h, c.y1 + 1) - Math.max(y, c.y0));
+        if (ow * oh >= 0.25 * w * h) hits.push(i);
+      }
+      if (hits.length < 2 || hits.length > 6) return [];
+      // Require at least two tracks with genuinely distinct velocities or non-overlapping predicted paths
+      // (filters out two fragments of one co-moving body/cloud)
+      let distinct = false;
+      for (let a = 0; a < hits.length && !distinct; a++) for (let b = a + 1; b < hits.length; b++) {
+        const fa = live[hits[a]], fb = live[hits[b]];
+        const dv = Math.hypot(fa.vx - fb.vx, fa.vy - fb.vy);
+        const la = fa.comps.at(-1)!, lb = fb.comps.at(-1)!;
+        const ga = t - la.t, gb = t - lb.t;
+        const distP = Math.hypot((la.cx + fa.vx * ga) - (lb.cx + fb.vx * gb), (la.cy + fa.vy * ga) - (lb.cy + fb.vy * gb));
+        if (dv >= 0.45 || distP >= 3) { distinct = true; break; }
+      }
+      if (!distinct) return [];
+      const minN = Math.min(...hits.map((i) => live[i].comps.at(-1)!.n));
+      const sumN = hits.reduce((s, i) => s + live[i].comps.at(-1)!.n, 0);
+      return c.n >= 1.2 * minN && c.n <= 2.2 * sumN ? hits : [];
+    };
+    cs.forEach((c, j) => {
+      const over = pairs.filter((q) => q[2] === j && q[3] > 0 && c.n >= 1.4 * live[q[1]].comps.at(-1)!.n);
+      if (over.length >= 2) both.add(j);
+      const movers = splitCands(j);
+      if (movers.length < 2) return;
+      // Build color histogram (4-bit per channel) from each track's last non-split frame
+      const models = movers.map((i) => {
+        const f = live[i], l = [...f.comps].reverse().find((q) => !q.split) ?? f.comps.at(-1)!, g = t - f.comps.at(-1)!.t;
+        const last = f.comps.at(-1)!, w = last.x1 - last.x0 + 1, h = last.y1 - last.y0 + 1;
+        const px0 = last.x0 + f.vx * g, py0 = last.y0 + f.vy * g;
+        const hist = new Map<number, number>(), fd = F0[l.t].data;
+        for (const p of l.pix) { const k = fd[p] >>> 12; hist.set(k, (hist.get(k) ?? 0) + 1); }
+        for (const [k, v] of hist) hist.set(k, v / Math.max(1, l.n));
+        return { i, last, px0, py0, px1: px0 + w - 1, py1: py0 + h - 1, pcx: last.cx + f.vx * g, pcy: last.cy + f.vy * g, hw: Math.max(2, w / 2), hh: Math.max(2, h / 2), hist, pix: [] as number[] };
+      });
+      const curD = F0[t].data;
+      for (const p of c.pix) {
+        const x = p % W, y = Math.floor(p / W), ck = curD[p] >>> 12;
+        let bestK = -1, bestCost = Infinity;
+        for (let k = 0; k < models.length; k++) {
+          const m = models[k];
+          const dBox = Math.hypot((x - m.pcx) / m.hw, (y - m.pcy) / m.hh);
+          if (dBox > 1.75) continue;
+          const inside = x >= m.px0 - 1 && x <= m.px1 + 1 && y >= m.py0 - 1 && y <= m.py1 + 1;
+          const cost = dBox + (inside ? 0 : 1.5) - 1.2 * (m.hist.get(ck) ?? 0);
+          if (cost < bestCost) { bestCost = cost; bestK = k; }
+        }
+        if (bestK >= 0) models[bestK].pix.push(p);
+      }
+      const valid = models.filter((m) => m.pix.length >= Math.max(4, 0.35 * m.last.n) && m.pix.length <= 1.7 * m.last.n);
+      // Only claim the blob when at least two competing tracks cleanly partition it (never drop blobs)
+      if (valid.length < 2) return;
+      both.add(j);
+      for (const m of valid) {
+        let x0 = W, y0 = H, x1 = 0, y1 = 0, sx = 0, sy = 0;
+        for (const p of m.pix) { const x = p % W, y = Math.floor(p / W); sx += x; sy += y; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+        // Keep velocity frozen across split frames so partial occlusion never bends the trajectory
+        live[m.i].comps.push({ x0, y0, x1, y1, n: m.pix.length, cx: sx / m.pix.length, cy: sy / m.pix.length, pix: m.pix, t, id: -1, split: true });
+        live[m.i].lost = 0;
+        tookF.add(m.i);
+      }
+    });
+    const tookC = new Set<number>(both);
     for (const [, i, j] of pairs.sort((a, b) => b[0] - a[0])) {
       if (tookF.has(i) || tookC.has(j)) continue;
       tookF.add(i); tookC.add(j);
@@ -251,13 +331,20 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     // (six frames at least, or all of a short clip: a GIF keeps a hold as one frame)
     if ((tr.length >= 6 || (tr.length === N && N >= 4)) && travel >= Math.max(8, 0.8 * size) && travel >= 0.6 * path && (sp <= Math.max(2, 0.5 * size) || steady >= 0.9 * (tr.length - 1) || oneWay) && (steady >= 0.7 * (tr.length - 1) || oneWay) && !swung(tr.map((c) => c.pix))) {
       // carried along: one drawing, or changing drawings (the thing cut out by its difference, bottom-centered)
-      const cut = tr.map((c) => cutout(F0[c.t], fg0[c.t], c, W));
+      const maskOf = (c: Comp) => {
+        if (!c.split) return fg0[c.t];
+        const m = new Uint8Array(WH);
+        for (const p of c.pix) m[p] = 1;
+        return m;
+      };
+      const cut = tr.map((c) => cutout(F0[c.t], maskOf(c), c, W));
       const { poses, cycle } = posesOf(cut, differ);
       const first = median(tr.slice(0, 3).map((c) => c.y1 - c.y0 + 1)), last = median(tr.slice(-3).map((c) => c.y1 - c.y0 + 1));
       const x0 = Math.min(...tr.map((c) => c.x0)), y0 = Math.min(...tr.map((c) => c.y0)), x1 = Math.max(...tr.map((c) => c.x1)), y1 = Math.max(...tr.map((c) => c.y1));
+      const trans = carriedTranslucency(F0, bg, tr, W);
       pieces.push({
-        kind: poses >= 3 ? "walk" : "carried", box: [x0, y0, x1 - x0 + 1, y1 - y0 + 1], frames: tr.length, poses, cycle, speed: [vx, vy], grow: last / first, ...(tr.some((c) => c.smear) ? { smears: { frames: tr.filter((c) => c.smear).map((c) => c.t), colors: [...new Set(tr.flatMap((c) => c.smear ?? []))] } } : {}),
-        track: tr.map((c) => [c.t, c.x0, c.y0, c.x1 - c.x0 + 1, c.y1 - c.y0 + 1]), ...captures(cycle >= 2 && tr.length >= cycle ? tr.slice(0, cycle) : spread(tr, 8), spread(tr, 8), (c) => ({ t: c.t, b: c, keep: carriedCut(fg0[c.t], c, W) }), F0),
+        kind: poses >= 3 ? "walk" : "carried", box: [x0, y0, x1 - x0 + 1, y1 - y0 + 1], frames: tr.length, poses, cycle, speed: [vx, vy], grow: last / first, ...(tr.some((c) => c.smear) ? { smears: { frames: tr.filter((c) => c.smear).map((c) => c.t), colors: [...new Set(tr.flatMap((c) => c.smear ?? []))] } } : {}), ...(trans ? { translucent: trans } : {}),
+        track: tr.map((c) => [c.t, c.x0, c.y0, c.x1 - c.x0 + 1, c.y1 - c.y0 + 1]), ...captures(cycle >= 2 && tr.length >= cycle ? tr.slice(0, cycle) : spread(tr, 8), spread(tr, 8), (c) => ({ t: c.t, b: c, keep: carriedCut(maskOf(c), c, W) }), F0),
       });
       // where it is each frame, a pixel wider
       for (const c of tr) for (const p of c.pix) { const x = p % W, y = Math.floor(p / W); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < W && yy < H) going[c.t][yy * W + xx] = 1; } }
@@ -341,6 +428,36 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const inA = new Set(a.px), both = b.px.filter((p) => inA.has(p)).length;
     const within = (g: Blob[], body: Set<number>) => { const px = g.flatMap((f) => f.pix); return px.filter((p) => body.has(p)).length >= 0.7 * px.length; };
     if (both >= 0.5 * (a.px.length + b.px.length - both) || (b.closed && within(gs[i], new Set(b.px))) || (a.closed && within(gs[j], inA))) up[top(i)] = top(j);
+  }
+  // Opposite edge bands of one floating/translucent body (e.g. a bobbing ghost whose uniform interior
+  // stays constant over a textured wall, leaving only top and bottom edge strips in `gs`): join two
+  // aligned, in-step groups when the two-layer float model explains their union box as one whole body.
+  if (N >= 4 && N <= 64 && gs.length >= 2 && gs.length <= 32) {
+    const gBox = gs.map((parts) => ({
+      x0: Math.min(...parts.map((f) => f.x0)), y0: Math.min(...parts.map((f) => f.y0)),
+      x1: Math.max(...parts.map((f) => f.x1)), y1: Math.max(...parts.map((f) => f.y1)),
+    }));
+    const gRhythm = gs.map((parts) => {
+      const px = parts.flatMap((f) => f.pix);
+      return F.map((_, t) => { let s = 0; for (const p of px) s += fg[t][p]; return s / Math.max(1, px.length); });
+    });
+    for (let i = 0; i < gs.length; i++) for (let j = i + 1; j < gs.length; j++) {
+      if (top(i) === top(j)) continue;
+      const a = gBox[i], b = gBox[j];
+      const ox = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) + 1;
+      const oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) + 1;
+      const aw = a.x1 - a.x0 + 1, bw2 = b.x1 - b.x0 + 1, ah = a.y1 - a.y0 + 1, bh2 = b.y1 - b.y0 + 1;
+      const alignedV = ox >= 0.65 * Math.min(aw, bw2) && Math.max(a.y0, b.y0) > Math.min(a.y1, b.y1) && Math.max(a.y0, b.y0) - Math.min(a.y1, b.y1) <= 48 && Math.max(ah, bh2) <= 10;
+      const alignedH = oy >= 0.65 * Math.min(ah, bh2) && Math.max(a.x0, b.x0) > Math.min(a.x1, b.x1) && Math.max(a.x0, b.x0) - Math.min(a.x1, b.x1) <= 48 && Math.max(aw, bw2) <= 10;
+      if (!alignedV && !alignedH) continue;
+      if (corr(gRhythm[i], gRhythm[j]) < 0.75) continue;
+      const uBox: Box = { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) };
+      if (uBox.x1 - uBox.x0 + 1 > 80 || uBox.y1 - uBox.y0 + 1 > 80) continue;
+      const gap = alignedV
+        ? { axis: "y" as const, lo: Math.min(a.y1, b.y1) + 1, hi: Math.max(a.y0, b.y0) - 1, spanLo: Math.max(a.x0, b.x0), spanHi: Math.min(a.x1, b.x1) }
+        : { axis: "x" as const, lo: Math.min(a.x1, b.x1) + 1, hi: Math.max(a.x0, b.x0) - 1, spanLo: Math.max(a.y0, b.y0), spanHi: Math.min(a.y1, b.y1) };
+      if (bodyFloatAndTranslucency(F0, bg, uBox, W, H, gap)) up[top(i)] = top(j);
+    }
   }
   const things = new Map<number, Blob[]>();
   gs.forEach((parts, i) => (things.get(top(i)) ?? things.set(top(i), []).get(top(i))!).push(...parts));
@@ -466,8 +583,18 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const own1 = (t: number) => { const m = new Uint8Array(WH); for (const p of pix) m[p] = fg[t][p]; return m; };
     const capture = (e: [number, number, number, number, number]): Cut => (about ? { t: e[0], b: box, keep: carriedCut(own1(e[0]), box, W) } : { t: e[0], b: boxAt(e), keep: matte(F[e[0]], fg[e[0]], boxAt(e), mine, model, W, tol, mode).keep });
     const steps = track.filter((e, i) => i === 0 || e[0] === track[i - 1][0] + 1);
+    const outBox: [number, number, number, number] = along || about || kind === "action" || once || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W);
+    // Whole-body float/bob tracking + two-layer translucency check for in-place moving bodies (e.g. floating ghosts)
+    const floatBox: Box = { x0: Math.min(x0, outBox[0]), y0: Math.min(y0, outBox[1]), x1: Math.max(x1, outBox[0] + outBox[2] - 1), y1: Math.max(y1, outBox[1] + outBox[3] - 1) };
+    const rawFloat = !along && !about && kind !== "light" && kind !== "effect" && N >= 4
+      ? bodyFloatAndTranslucency(F0, bg, floatBox, W, H)
+      : null;
+    // Opaque subpixel motion (half-pixel breathing) stays `sub`; a confirmed translucent floater is translucency, not subpixel.
+    const floatRes = rawFloat && (!small || rawFloat.translucent) ? rawFloat : null;
+    const isSub = small && !floatRes?.translucent;
+    const finalBox: [number, number, number, number] = floatRes ? [floatBox.x0, floatBox.y0, floatBox.x1 - floatBox.x0 + 1, floatBox.y1 - floatBox.y0 + 1] : outBox;
     pieces.push({
-      kind, box: along || about || kind === "action" || once || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle: cyc, ...(loop ? { loop } : {}), parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), ...(small ? { sub: true } : {}), track,
+      kind, box: finalBox, frames: track.length, poses, cycle: cyc, ...(loop ? { loop } : {}), parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), ...(isSub ? { sub: true } : {}), ...(floatRes?.float ? { float: floatRes.float } : {}), ...(floatRes?.translucent ? { translucent: floatRes.translucent } : {}), track,
       ...(kind === "action" || kind === "walk" ? smearsOf(F, roomy(x0, y0, bw, bh, 2), W, fg) : {}),
       ...captures(cyc >= 2 && steps.length >= cyc ? steps.slice(0, cyc) : spread(track, 8), spread(track, 8), capture, F0),
     });
@@ -503,6 +630,17 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       const { poses, cycle } = posesOf(F0.map((f) => crop(f, box, W)), differ);
       const cut = (e: [number, number, number, number, number]): Cut => { const keep = new Uint8Array(bw * bh); for (let i = 0; i < bw * bh; i++) keep[i] = light.relit[e[0]][(reg.y0 + Math.floor(i / bw)) * W + reg.x0 + (i % bw)]; return { t: e[0], b: box, keep }; };
       const steps = track.filter((e, i) => i === 0 || e[0] === track[i - 1][0] + 1);
+      // Two-layer moving additive body check: a floating additive ghost's residual (I_t - bg) translates
+      // rigidly by (dx, dy) frame-to-frame, whereas a stationary lamp's scales in place.
+      const ghost = movingAdditiveBody(F0, bg, box, W, H, lightColor(mean[strongest]));
+      if (ghost) {
+        pieces.push({
+          kind: "anim", box: [reg.x0, reg.y0, bw, bh], frames: track.length, poses, cycle, track,
+          float: ghost.float, translucent: ghost.translucent,
+          ...captures(cycle >= 2 && steps.length >= cycle ? steps.slice(0, cycle) : spread(track, 8), spread(track, 8), cut, F0),
+        });
+        continue;
+      }
       // what it captures is the light itself: its color, as strong as its change (what a glow() paints)
       const glow: Img[] = [];
       for (const [t] of [...spread(track, 8), ...steps.slice(0, Math.max(1, cycle))]) {
@@ -926,4 +1064,494 @@ function partialOf(F: Img[], pix: number[], W: number, H: number): number {
     if ((eb && (a === eb[0] || a === eb[1])) || (ea && (b === ea[0] || b === ea[1])) || toward(F[t], F[t - 1], p, a) || toward(F[t - 1], F[t], p, b)) partial++;
   }
   return changed ? partial / changed : 0;
+}
+
+type TransSample = { I1: Color; I2: Color; B1: Color; B2: Color };
+
+/**
+ * Szeliski-Avidan-Anandan two-layer translucency estimate from pixel pairs seeing the same moving
+ * foreground pixel over two different known background colors: ΔI = (1 - α) ΔB for alpha compositing,
+ * and ΔI = ΔB with I - B >= 0 for additive blending.
+ */
+function measureTranslucency(samples: TransSample[]): Piece["translucent"] | undefined {
+  const ks: number[] = [];
+  let good = 0, total = 0, posCh = 0, totCh = 0, gainSum = 0;
+  const diffSum = [0, 0, 0];
+  const kept: TransSample[] = [];
+  for (const s of samples) {
+    if ((s.I1 & 255) < 128 || (s.I2 & 255) < 128 || (s.B1 & 255) < 128 || (s.B2 & 255) < 128) continue;
+    const i1 = channels(s.I1), i2 = channels(s.I2), b1 = channels(s.B1), b2 = channels(s.B2);
+    // Skip saturated pixels so clamped additive highlights don't bias k downward
+    if (i1[0] >= 252 || i1[1] >= 252 || i1[2] >= 252 || i2[0] >= 252 || i2[1] >= 252 || i2[2] >= 252) continue;
+    const e1 = Math.hypot(i1[0] - b1[0], i1[1] - b1[1], i1[2] - b1[2]);
+    const e2 = Math.hypot(i2[0] - b2[0], i2[1] - b2[1], i2[2] - b2[2]);
+    if (e1 < 12 || e2 < 12) continue;
+    const dbr = b2[0] - b1[0], dbg = b2[1] - b1[1], dbb = b2[2] - b1[2];
+    const db2 = dbr * dbr + dbg * dbg + dbb * dbb;
+    if (db2 < 24 * 24) continue;
+    const dir = i2[0] - i1[0], dig = i2[1] - i1[1], dib = i2[2] - i1[2];
+    const k = (dir * dbr + dig * dbg + dib * dbb) / db2;
+    const orth = Math.hypot(dir - k * dbr, dig - k * dbg, dib - k * dbb) / Math.sqrt(db2);
+    total++;
+    if (orth < 0.35 && k > -0.15 && k < 1.35) {
+      good++;
+      ks.push(k);
+      kept.push(s);
+      for (let c = 0; c < 3; c++) {
+        const d1 = i1[c] - b1[c], d2 = i2[c] - b2[c];
+        if (d1 >= -4) posCh++;
+        if (d2 >= -4) posCh++;
+        totCh += 2;
+        diffSum[c] += d1 + d2;
+      }
+      gainSum += ((i1[0] - b1[0]) + (i1[1] - b1[1]) + (i1[2] - b1[2])) / (3 * 255);
+    }
+  }
+  if (total < 12 || ks.length < 12 || good / total < 0.72) return undefined;
+  ks.sort((a, b) => a - b);
+  const kMed = ks[ks.length >> 1];
+  const iqr = ks[Math.floor(0.75 * (ks.length - 1))] - ks[Math.floor(0.25 * (ks.length - 1))];
+  if (iqr > 0.28) return undefined;
+  const posFrac = posCh / Math.max(1, totCh), meanGain = gainSum / Math.max(1, ks.length);
+  if (kMed >= 0.85 && kMed <= 1.18 && posFrac >= 0.75 && meanGain > 0.04) {
+    const n2 = Math.max(1, ks.length * 2);
+    const ar = Math.max(0, Math.min(255, Math.round(diffSum[0] / n2)));
+    const ag = Math.max(0, Math.min(255, Math.round(diffSum[1] / n2)));
+    const ab = Math.max(0, Math.min(255, Math.round(diffSum[2] / n2)));
+    const peak = Math.max(1, ar, ag, ab), sc = 255 / peak;
+    const tint = pack(Math.round(ar * sc), Math.round(ag * sc), Math.round(ab * sc));
+    return { blend: "add", opacity: +Math.min(1, Math.max(0.1, peak / 255)).toFixed(2), tint };
+  }
+  if (kMed >= 0.14 && kMed <= 0.85) {
+    const alpha = Math.max(0.15, Math.min(0.86, 1 - kMed));
+    let fr = 0, fg = 0, fb = 0, fn = 0;
+    for (const s of kept) {
+      const i1 = channels(s.I1), b1 = channels(s.B1);
+      fr += Math.max(0, Math.min(255, (i1[0] - (1 - alpha) * b1[0]) / alpha));
+      fg += Math.max(0, Math.min(255, (i1[1] - (1 - alpha) * b1[1]) / alpha));
+      fb += Math.max(0, Math.min(255, (i1[2] - (1 - alpha) * b1[2]) / alpha));
+      fn++;
+    }
+    const tint = fn ? pack(Math.round(fr / fn), Math.round(fg / fn), Math.round(fb / fn)) : undefined;
+    return { blend: "alpha", opacity: +alpha.toFixed(2), ...(tint ? { tint } : {}) };
+  }
+  return undefined;
+}
+
+/** Check whether a carried moving piece is translucent (alpha or additive) across background transitions. */
+function carriedTranslucency(F: Img[], bg: Uint32Array, tr: Comp[], W: number): Piece["translucent"] | undefined {
+  const clean = tr.filter((c) => !c.split);
+  if (clean.length < 2) return undefined;
+  const H = F[0].h, samples: TransSample[] = [];
+  const step = Math.max(1, Math.floor((clean.length - 1) / 14));
+  for (let i = 0; i + 1 < clean.length && samples.length < 1500; i += step) {
+    const a = clean[i], b = clean[Math.min(clean.length - 1, i + Math.max(1, Math.min(2, clean.length - 1 - i)))];
+    const wa = a.x1 - a.x0 + 1, ha = a.y1 - a.y0 + 1, wb = b.x1 - b.x0 + 1, hb = b.y1 - b.y0 + 1;
+    if (Math.abs(wa - wb) > 2 || Math.abs(ha - hb) > 2) continue;
+    const dx = Math.round(b.cx - a.cx), dy = Math.round(b.cy - a.cy);
+    if (Math.hypot(dx, dy) < 1) continue;
+    const bSet = new Set(b.pix), fa = F[a.t].data, fb = F[b.t].data;
+    for (const p of a.pix) {
+      const x = p % W, y = Math.floor(p / W), x2 = x + dx, y2 = y + dy;
+      if (x2 < 0 || y2 < 0 || x2 >= W || y2 >= H) continue;
+      const p2 = y2 * W + x2;
+      if (!bSet.has(p2)) continue;
+      samples.push({ I1: fa[p], I2: fb[p2], B1: bg[p], B2: bg[p2] });
+      if (samples.length >= 1500) break;
+    }
+  }
+  return measureTranslucency(samples);
+}
+
+/**
+ * Fast 1-channel closed-form telescoping fit of D(x, y) = A(x - dx, y - dy) - A(x, y) over a w×h patch
+ * with A = 0 outside the patch. Stops early once `err` exceeds `cutoff`.
+ */
+function telescopeLuma(D: Float32Array, w: number, h: number, dx: number, dy: number, nonNeg: boolean, cutoff: number, A: Float32Array): { err: number; score: number } {
+  const fwd = dy > 0 || (dy === 0 && dx > 0);
+  const yStart = fwd ? 0 : h - 1, yEnd = fwd ? h : -1, yStep = fwd ? 1 : -1;
+  const xStart = fwd ? 0 : w - 1, xEnd = fwd ? w : -1, xStep = fwd ? 1 : -1;
+  let err = 0, l1A = 0, tvA = 0;
+  for (let y = yStart; y !== yEnd; y += yStep) {
+    for (let x = xStart; x !== xEnd; x += xStep) {
+      const idx = y * w + x;
+      const px = x - dx, py = y - dy;
+      const prev = px >= 0 && px < w && py >= 0 && py < h ? A[py * w + px] : 0;
+      let v = prev - D[idx];
+      if (nonNeg) {
+        if (v < 0) { err += -v; v = 0; }
+        else if (v > 255) { err += v - 255; v = 255; }
+      } else if (v < -255) { err += -255 - v; v = -255; }
+      else if (v > 255) { err += v - 255; v = 255; }
+      A[idx] = v;
+      l1A += Math.abs(v);
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || nx >= w || ny < 0 || ny >= h) err += Math.abs(v);
+      if (err > cutoff) return { err, score: Infinity };
+    }
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const idx = y * w + x, v = A[idx];
+    if (x + 1 < w) tvA += Math.abs(v - A[idx + 1]);
+    if (y + 1 < h) tvA += Math.abs(v - A[idx + w]);
+  }
+  return { err, score: err + 0.15 * tvA + 0.03 * l1A };
+}
+
+/** Reconstruct RGB layer A(x, y) for one chosen shift (dx, dy). */
+function telescopeRgb(f0: Uint32Array, ft: Uint32Array, W: number, x0: number, y0: number, w: number, h: number, dx: number, dy: number, nonNeg: boolean): Float32Array {
+  const A = new Float32Array(w * h * 3);
+  const fwd = dy > 0 || (dy === 0 && dx > 0);
+  const yStart = fwd ? 0 : h - 1, yEnd = fwd ? h : -1, yStep = fwd ? 1 : -1;
+  const xStart = fwd ? 0 : w - 1, xEnd = fwd ? w : -1, xStep = fwd ? 1 : -1;
+  for (let y = yStart; y !== yEnd; y += yStep) for (let x = xStart; x !== xEnd; x += xStep) {
+    const p = (y0 + y) * W + (x0 + x), idx = (y * w + x) * 3;
+    const a = channels(f0[p]), b = channels(ft[p]);
+    const px = x - dx, py = y - dy, pIdx = px >= 0 && px < w && py >= 0 && py < h ? (py * w + px) * 3 : -1;
+    for (let c = 0; c < 3; c++) {
+      let v = (pIdx >= 0 ? A[pIdx + c] : 0) - (b[c] - a[c]);
+      A[idx + c] = nonNeg ? Math.max(0, Math.min(255, v)) : Math.max(-255, Math.min(255, v));
+    }
+  }
+  return A;
+}
+
+/**
+ * Whole-body float/bob detector + two-layer translucency check for in-place moving bodies (e.g. a
+ * floating ghost). Uses a fast 1-channel peak-frame gate before evaluating all frames, verifies that
+ * the moving body covers most of the piece's box (not just a single limb), then estimates translucency
+ * from boundary pixels whose background is exposed in other frames.
+ */
+function bodyFloatAndTranslucency(
+  F: Img[], _bg: Uint32Array, box: Box, W: number, H: number,
+  gap?: { axis: "x" | "y"; lo: number; hi: number; spanLo: number; spanHi: number },
+): { float: [number, number][]; translucent?: Piece["translucent"] } | null {
+  const N = F.length;
+  if (N < 4 || N > 64) return null;
+  const origW = box.x1 - box.x0 + 1, origH = box.y1 - box.y0 + 1;
+  if (origW < 4 || origH < 4 || origW > 96 || origH > 96) return null;
+  const pad = 4;
+  const x0 = Math.max(0, box.x0 - pad), y0 = Math.max(0, box.y0 - pad);
+  const x1 = Math.min(W - 1, box.x1 + pad), y1 = Math.min(H - 1, box.y1 + pad);
+  const w = x1 - x0 + 1, h = y1 - y0 + 1, n = w * h;
+  if (n > 8100) return null;
+
+  const f0 = F[0].data;
+  const luma = (c: Color) => (((c >>> 24) & 255) + ((c >>> 16) & 255) + ((c >>> 8) & 255)) / 3;
+  const L0 = new Float32Array(n);
+  let outSum = 0, outCnt = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const v = luma(f0[(y0 + y) * W + (x0 + x)]);
+    L0[y * w + x] = v;
+    if (x === 0 || y === 0 || x === w - 1 || y === h - 1) { outSum += v; outCnt++; }
+  }
+  const muOut = outCnt ? outSum / outCnt : 128;
+
+  // Build 1-channel difference maps and find peak-change frame for an O(1) early-exit gate
+  const Ds: Float32Array[] = [new Float32Array(0)], Es: number[] = [0];
+  let tPeak = -1, peakE = 0;
+  for (let t = 1; t < N; t++) {
+    const ft = F[t].data, D = new Float32Array(n);
+    let e = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x, d = luma(ft[(y0 + y) * W + (x0 + x)]) - L0[i];
+      D[i] = d; e += Math.abs(d);
+    }
+    Ds.push(D); Es.push(e);
+    if (e > peakE) { peakE = e; tPeak = t; }
+  }
+  if (tPeak < 1 || peakE < origW * origH * 0.5) return null;
+
+  const scratch = new Float32Array(n), bestBuf = new Float32Array(n);
+  const fitFrame = (D: Float32Array, dEnergy: number, maxR: number, refA?: Float32Array) => {
+    const cutoff = 0.35 * dEnergy;
+    let bestScore = Infinity, bestErr = dEnergy, bdx = 0, bdy = 0;
+    for (let dy = -maxR; dy <= maxR; dy++) for (let dx = -maxR; dx <= maxR; dx++) {
+      if (!dx && !dy) continue;
+      const fit = telescopeLuma(D, w, h, dx, dy, false, cutoff, scratch);
+      if (fit.score >= bestScore) continue;
+      if (refA) {
+        // Require consistent layer sign with peakA so (+dx,+dy) and (-dx,-dy) never flip signs
+        let dot = 0;
+        for (let i = 0; i < n; i++) dot += scratch[i] * refA[i];
+        if (dot <= 0) continue;
+      }
+      bestScore = fit.score; bestErr = fit.err; bdx = dx; bdy = dy; bestBuf.set(scratch);
+    }
+    return { bestErr, bdx, bdy };
+  };
+
+  // Peak-frame gate: immediately reject 99% of non-floating pieces without scanning all frames
+  let peakFit = fitFrame(Ds[tPeak], peakE, 4);
+  if (peakFit.bestErr >= 0.35 * peakE || (!peakFit.bdx && !peakFit.bdy)) return null;
+
+  // Resolve the signed telescoping +/-d symmetry on tPeak: for the true shift +d, the reconstructed
+  // contrast layer A(p) = C(p) - B(p) correlates positively with L0(p) - muOut, whereas -d yields -A(p-d).
+  const peakA = new Float32Array(bestBuf);
+  let peakShift: [number, number] = [peakFit.bdx, peakFit.bdy];
+  const oppFit = telescopeLuma(Ds[tPeak], w, h, -peakFit.bdx, -peakFit.bdy, false, 0.35 * peakE, scratch);
+  if (oppFit.err <= peakFit.bestErr + 0.05 * peakE) {
+    let dotPos = 0, dotNeg = 0;
+    for (let i = 0; i < n; i++) {
+      const c0 = L0[i] - muOut;
+      if (Math.abs(peakA[i]) >= 10) dotPos += peakA[i] * c0;
+      if (Math.abs(scratch[i]) >= 10) dotNeg += scratch[i] * c0;
+    }
+    if (dotNeg > dotPos) {
+      peakA.set(scratch);
+      peakShift = [-peakFit.bdx, -peakFit.bdy];
+      peakFit = { bestErr: oppFit.err, bdx: peakShift[0], bdy: peakShift[1] };
+    }
+  }
+
+  // Optional gap check (from opposite-edge band merger): shift must be along the gap axis and peakA must
+  // solidly span the interior gap between the two edge strips (so two side-by-side figures never merge).
+  if (gap) {
+    if (gap.axis === "y" && Math.abs(peakShift[1]) <= Math.abs(peakShift[0])) return null;
+    if (gap.axis === "x" && Math.abs(peakShift[0]) <= Math.abs(peakShift[1])) return null;
+    let gapTotal = 0, gapFilled = 0;
+    if (gap.axis === "y") {
+      for (let gy = gap.lo; gy <= gap.hi; gy++) for (let gx = gap.spanLo; gx <= gap.spanHi; gx++) {
+        const lx = gx - x0, ly = gy - y0;
+        if (lx < 0 || lx >= w || ly < 0 || ly >= h) continue;
+        gapTotal++;
+        if (Math.abs(peakA[ly * w + lx]) >= 10) gapFilled++;
+      }
+    } else {
+      for (let gy = gap.spanLo; gy <= gap.spanHi; gy++) for (let gx = gap.lo; gx <= gap.hi; gx++) {
+        const lx = gx - x0, ly = gy - y0;
+        if (lx < 0 || lx >= w || ly < 0 || ly >= h) continue;
+        gapTotal++;
+        if (Math.abs(peakA[ly * w + lx]) >= 10) gapFilled++;
+      }
+    }
+    if (gapTotal > 0 && gapFilled / gapTotal < 0.65) return null;
+  }
+
+  const shifts: [number, number][] = [[0, 0]];
+  let totalD = 0, totalErr = 0, moved = 0;
+  const ox0 = box.x0 - x0, oy0 = box.y0 - y0;
+
+  for (let t = 1; t < N; t++) {
+    const dEnergy = Es[t];
+    if (dEnergy < origW * origH * 0.5) { shifts.push([0, 0]); continue; }
+    totalD += dEnergy;
+    let bestErr: number, bdx: number, bdy: number;
+    if (t === tPeak) {
+      bestErr = peakFit.bestErr; bdx = peakShift[0]; bdy = peakShift[1];
+      bestBuf.set(peakA);
+    } else {
+      const f = fitFrame(Ds[t], dEnergy, 4, peakA);
+      bestErr = f.bestErr; bdx = f.bdx; bdy = f.bdy;
+    }
+    if (bestErr < 0.35 * dEnergy && (bdx || bdy)) {
+      let ax0 = w, ay0 = h, ax1 = -1, ay1 = -1, aCount = 0, leadE = 0, trailE = 0;
+      const D = Ds[t];
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (Math.abs(bestBuf[i]) >= 10) { aCount++; if (x < ax0) ax0 = x; if (x > ax1) ax1 = x; if (y < ay0) ay0 = y; if (y > ay1) ay1 = y; }
+        const dMag = Math.abs(D[i]);
+        if (dMag > 6) {
+          if (Math.abs(bdy) >= Math.abs(bdx)) { if (y < oy0 + origH / 2) trailE += dMag; else leadE += dMag; }
+          else { if (x < ox0 + origW / 2) trailE += dMag; else leadE += dMag; }
+        }
+      }
+      const aw = ax1 >= ax0 ? ax1 - ax0 + 1 : 0, ah = ay1 >= ay0 ? ay1 - ay0 + 1 : 0;
+      if (aw >= 0.70 * origW && ah >= 0.70 * origH && aCount >= 0.30 * origW * origH && Math.min(leadE, trailE) >= 0.2 * Math.max(1, leadE + trailE)) {
+        shifts.push([bdx, bdy]);
+        totalErr += bestErr;
+        moved++;
+        continue;
+      }
+    }
+    shifts.push([0, 0]);
+    totalErr += dEnergy;
+  }
+
+  if (moved < Math.max(2, Math.ceil(0.25 * N)) || totalD <= 0 || totalErr > 0.38 * totalD || (!peakShift[0] && !peakShift[1])) return null;
+  for (let t = 1; t < N; t++) {
+    if (Math.abs(shifts[t][0] - shifts[t - 1][0]) + Math.abs(shifts[t][1] - shifts[t - 1][1]) > 5) return null;
+  }
+
+  // Reconstruct RGB A once on tPeak for accurate mask support
+  const rgbA = telescopeRgb(f0, F[tPeak].data, W, x0, y0, w, h, peakShift[0], peakShift[1], false);
+  const maskA = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const idx = i * 3;
+    if (Math.max(Math.abs(rgbA[idx]), Math.abs(rgbA[idx + 1]), Math.abs(rgbA[idx + 2])) >= 14) maskA[i] = 1;
+  }
+  const knownBg = new Uint32Array(n);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    for (let t = 0; t < N; t++) {
+      const ux = x - shifts[t][0], uy = y - shifts[t][1];
+      if (ux < 0 || ux >= w || uy < 0 || uy >= h || !maskA[uy * w + ux]) {
+        knownBg[y * w + x] = F[t].data[(y0 + y) * W + (x0 + x)];
+        break;
+      }
+    }
+  }
+  const samples: TransSample[] = [];
+  // 1. Temporal pairs: same foreground pixel (u, v) crossing two distinct known background colors
+  for (let t1 = 0; t1 < N && samples.length < 1500; t1++) {
+    for (let t2 = t1 + 1; t2 < N && samples.length < 1500; t2++) {
+      const sdx = shifts[t2][0] - shifts[t1][0], sdy = shifts[t2][1] - shifts[t1][1];
+      if (!sdx && !sdy) continue;
+      const d1 = F[t1].data, d2 = F[t2].data;
+      for (let v = 0; v < h; v++) for (let u = 0; u < w; u++) {
+        if (!maskA[v * w + u]) continue;
+        const x1p = u + shifts[t1][0], y1p = v + shifts[t1][1];
+        const x2p = u + shifts[t2][0], y2p = v + shifts[t2][1];
+        if (x1p < 0 || x1p >= w || y1p < 0 || y1p >= h || x2p < 0 || x2p >= w || y2p < 0 || y2p >= h) continue;
+        const b1 = knownBg[y1p * w + x1p], b2 = knownBg[y2p * w + x2p];
+        if (!b1 || !b2 || b1 === b2) continue;
+        samples.push({ I1: d1[(y0 + y1p) * W + (x0 + x1p)], I2: d2[(y0 + y2p) * W + (x0 + x2p)], B1: b1, B2: b2 });
+        if (samples.length >= 1500) break;
+      }
+    }
+  }
+  // 2. Spatial along-strip fallback: when a small bob (e.g. 2 px over 4 px-tall bricks) keeps every
+  // exposed row within one vertical brick band, sample pairs along the exposed strip across perpendicular
+  // background edges (e.g. horizontal brick mortar seams) where both pixels lie inside the foreground body.
+  if (samples.length < 16) {
+    const vert = Math.abs(peakShift[1]) >= Math.abs(peakShift[0]);
+    for (let t = 0; t < N && samples.length < 1500; t++) {
+      const dt = F[t].data, sx = shifts[t][0], sy = shifts[t][1];
+      for (let v = 0; v < h && samples.length < 1500; v++) for (let u = 0; u < w && samples.length < 1500; u++) {
+        if (!maskA[v * w + u]) continue;
+        const xp = u + sx, yp = v + sy;
+        if (xp < 0 || xp >= w || yp < 0 || yp >= h) continue;
+        const b1 = knownBg[yp * w + xp];
+        if (!b1) continue;
+        for (const step of [1, 2]) {
+          const u2 = vert ? u + step : u, v2 = vert ? v : v + step;
+          if (u2 >= w || v2 >= h || !maskA[v2 * w + u2]) continue;
+          const x2p = u2 + sx, y2p = v2 + sy;
+          if (x2p < 0 || x2p >= w || y2p < 0 || y2p >= h) continue;
+          const b2 = knownBg[y2p * w + x2p];
+          if (!b2 || b2 === b1) continue;
+          samples.push({ I1: dt[(y0 + yp) * W + (x0 + xp)], I2: dt[(y0 + y2p) * W + (x0 + x2p)], B1: b1, B2: b2 });
+          if (samples.length >= 1500) break;
+        }
+      }
+    }
+  }
+  const translucent = measureTranslucency(samples);
+  return { float: shifts, ...(translucent ? { translucent } : {}) };
+}
+
+/**
+ * Rescue an additive floating body (e.g. a glowing/additive ghost) that `relight` absorbed into `lamps`.
+ * Compares the stationary non-negative lamp model (I_t - B_min = s_t * L, L >= 0) against a rigidly
+ * translating additive body (I_t - I_0 = A(p - d_t) - A(p), A >= 0). Stationary lamps fit the rank-1
+ * non-negative model with near-zero error, guaranteeing zero false positives on pulsing lights.
+ */
+function movingAdditiveBody(F: Img[], _bg: Uint32Array, box: Box, W: number, H: number, fallbackTint: Color): { float: [number, number][]; translucent: NonNullable<Piece["translucent"]> } | null {
+  const N = F.length;
+  if (N < 4 || N > 64) return null;
+  const origW = box.x1 - box.x0 + 1, origH = box.y1 - box.y0 + 1;
+  if (origW < 4 || origH < 4 || origW > 80 || origH > 80) return null;
+  const pad = 4;
+  const x0 = Math.max(0, box.x0 - pad), y0 = Math.max(0, box.y0 - pad);
+  const x1 = Math.min(W - 1, box.x1 + pad), y1 = Math.min(H - 1, box.y1 + pad);
+  const w = x1 - x0 + 1, h = y1 - y0 + 1, n = w * h;
+  if (n > 6400) return null;
+
+  const luma = (c: Color) => (((c >>> 24) & 255) + ((c >>> 16) & 255) + ((c >>> 8) & 255)) / 3;
+  const bMin = new Float32Array(n).fill(255), lMax = new Float32Array(n);
+  const Ls: Float32Array[] = [];
+  for (let t = 0; t < N; t++) {
+    const d = F[t].data, L = new Float32Array(n);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x, v = luma(d[(y0 + y) * W + (x0 + x)]);
+      L[i] = v;
+      if (v < bMin[i]) bMin[i] = v;
+    }
+    Ls.push(L);
+  }
+  let lNorm2 = 0;
+  for (let t = 0; t < N; t++) {
+    const L = Ls[t];
+    for (let i = 0; i < n; i++) { const diff = L[i] - bMin[i]; if (diff > lMax[i]) lMax[i] = diff; }
+  }
+  for (let i = 0; i < n; i++) lNorm2 += lMax[i] * lMax[i];
+  if (lNorm2 < 40) return null;
+
+  // Evaluate stationary non-negative lamp error: R_t = L_t - bMin ≈ s_t * lMax
+  let lampEnergy = 0, errLamp = 0;
+  for (let t = 0; t < N; t++) {
+    const L = Ls[t];
+    let dot = 0;
+    for (let i = 0; i < n; i++) { const r = L[i] - bMin[i]; dot += r * lMax[i]; lampEnergy += r; }
+    const s = Math.max(0, Math.min(1, dot / lNorm2));
+    for (let i = 0; i < n; i++) errLamp += Math.abs((L[i] - bMin[i]) - s * lMax[i]);
+  }
+  if (lampEnergy <= 0 || errLamp < 0.30 * lampEnergy) return null;
+
+  // Compute 1-channel frame diffs against frame 0 and gate on peak frame first
+  const Ds: Float32Array[] = [new Float32Array(0)], Es: number[] = [0], BPs: boolean[] = [false];
+  let tPeak = -1, peakE = 0;
+  for (let t = 1; t < N; t++) {
+    const D = new Float32Array(n), L0 = Ls[0], Lt = Ls[t];
+    let e = 0, posE = 0, negE = 0;
+    for (let i = 0; i < n; i++) {
+      const d = Lt[i] - L0[i];
+      D[i] = d;
+      const ad = Math.abs(d);
+      e += ad;
+      if (d > 0) posE += d; else negE += -d;
+    }
+    Ds.push(D); Es.push(e); BPs.push(Math.min(posE, negE) >= 0.25 * e);
+    if (e > peakE) { peakE = e; tPeak = t; }
+  }
+  if (tPeak < 1 || peakE < origW * origH * 0.5 || !BPs[tPeak]) return null;
+
+  const scratch = new Float32Array(n);
+  const fitAdd = (D: Float32Array, dEnergy: number) => {
+    const cutoff = 0.28 * dEnergy;
+    let bestScore = Infinity, bestErr = dEnergy, bdx = 0, bdy = 0;
+    for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) {
+      if (!dx && !dy) continue;
+      const fit = telescopeLuma(D, w, h, dx, dy, true, cutoff, scratch);
+      if (fit.score < bestScore) { bestScore = fit.score; bestErr = fit.err; bdx = dx; bdy = dy; }
+    }
+    return { bestErr, bdx, bdy };
+  };
+
+  // Peak-frame gate
+  const peakFit = fitAdd(Ds[tPeak], peakE);
+  if (peakFit.bestErr >= 0.28 * peakE || (!peakFit.bdx && !peakFit.bdy)) return null;
+
+  const shifts: [number, number][] = [[0, 0]];
+  let totalD = 0, totalErr = 0, moved = 0;
+  let peakShift: [number, number] = [peakFit.bdx, peakFit.bdy];
+  for (let t = 1; t < N; t++) {
+    const dEnergy = Es[t];
+    if (dEnergy < origW * origH * 0.5) { shifts.push([0, 0]); continue; }
+    totalD += dEnergy;
+    if (!BPs[t]) { shifts.push([0, 0]); totalErr += dEnergy; continue; }
+    const { bestErr, bdx, bdy } = t === tPeak ? peakFit : fitAdd(Ds[t], dEnergy);
+    if (bestErr < 0.28 * dEnergy && (bdx || bdy)) {
+      shifts.push([bdx, bdy]); totalErr += bestErr; moved++;
+    } else {
+      shifts.push([0, 0]); totalErr += dEnergy;
+    }
+  }
+
+  if (moved < Math.max(2, Math.ceil(0.25 * N)) || totalD <= 0 || totalErr > 0.28 * totalD) return null;
+  for (let t = 1; t < N; t++) {
+    if (Math.abs(shifts[t][0] - shifts[t - 1][0]) + Math.abs(shifts[t][1] - shifts[t - 1][1]) > 5) return null;
+  }
+
+  // Reconstruct RGB additive layer once on tPeak to estimate tint & strength
+  const bestA = telescopeRgb(F[0].data, F[tPeak].data, W, x0, y0, w, h, peakShift[0], peakShift[1], true);
+  let sr = 0, sg = 0, sb = 0, cnt = 0;
+  for (let i = 0; i < n; i++) {
+    const r = bestA[i * 3], g = bestA[i * 3 + 1], b = bestA[i * 3 + 2];
+    if (Math.max(r, g, b) >= 12) { sr += r; sg += g; sb += b; cnt++; }
+  }
+  if (cnt < 8) return null;
+  const mr = sr / cnt, mg = sg / cnt, mb = sb / cnt, peak = Math.max(1, mr, mg, mb);
+  const tint = peak >= 10 ? pack(Math.round((mr / peak) * 255), Math.round((mg / peak) * 255), Math.round((mb / peak) * 255)) : fallbackTint;
+  const opacity = +Math.min(1, Math.max(0.1, peak / 255)).toFixed(2);
+  return { float: shifts, translucent: { blend: "add", opacity, tint } };
 }

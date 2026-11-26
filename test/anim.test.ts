@@ -569,3 +569,32 @@ anim("layered", { w: 4, h: 1, frames: 2, fps: 10 }, layer("a", (c, fi) => c.px(f
   warnProj.frames("still_fi");
   assert.ok(warnProj.warnings.some((w) => w.msg.includes("still_fi") && w.msg.includes("one frame")), warnProj.warnings.map((w) => w.msg).join("\n"));
 });
+
+test("Wave C loops: scene({ loop: 'longest' | 'hold' }), c.asset() read-only not joining loops, cappedBy naming offending anims", () => {
+  const src = PAL + `
+anim("a3", { w: 1, h: 1, frames: 3, ms: 100 }, (c, fi) => c.px(0, 0, fi === 0 ? "r" : fi === 1 ? "g" : "w"))
+anim("b5", { w: 1, h: 1, frames: 5, ms: 100 }, (c, fi) => c.px(0, 0, fi === 4 ? "w" : "r"))
+scene("s_long", { w: 2, h: 1, loop: "longest" }, stamp("a3", 0, 0), stamp("b5", 1, 0))
+scene("s_hold", { w: 2, h: 1, loop: "hold" }, stamp("a3", 0, 0), stamp("b5", 1, 0))
+scene("s_read", { w: 1, h: 1 }, (c) => { const im = c.asset("a3"); c.px(0, 0, im.get(0, 0) ? "g" : "k") })
+anim("p7", { w: 1, h: 1, frames: 7, ms: 130 }, (c) => c.px(0, 0, "r"))
+anim("p11", { w: 1, h: 1, frames: 11, ms: 170 }, (c) => c.px(0, 0, "g"))
+scene("s_cap", { w: 2, h: 1 }, stamp("p7", 0, 0), stamp("p11", 1, 0))`;
+  const p = loadSource(src, "t.px.js");
+  assert.equal(p.timeline("s_long")!.loop, 500, "loop: 'longest' runs for longest child (500ms, not LCM 1500ms)");
+  assert.equal(p.timeline("s_hold")!.loop, 500, "loop: 'hold' runs for longest child");
+  // At t=400ms (past a3's 300ms loop), loop:'longest' wraps a3 to frame 1 ('g'), while loop:'hold' holds a3 on frame 0 ('r')
+  assert.equal(p.image("s_long", 0, 400).get(0, 0), p.pal.resolve("g"), "loop: 'longest' wraps shorter anim");
+  assert.equal(p.image("s_hold", 0, 400).get(0, 0), p.pal.resolve("r"), "loop: 'hold' holds shorter anim on frame 0");
+  assert.equal(p.timeline("s_read"), undefined, "c.asset() read-only inspection does not join the scene's animation loop");
+  const capTl = p.timeline("s_cap")!;
+  assert.equal(capTl.capped, true);
+  assert.ok(capTl.cappedBy && capTl.cappedBy.includes("p7") && capTl.cappedBy.includes("p11"), `cappedBy names offending anims: ${capTl.cappedBy}`);
+  const dir = mkdtempSync(join(tmpdir(), "pxl-cap-"));
+  try {
+    p.frames = () => [];
+    const out = writeOutputs(p, dir, { only: ["s_cap"], preview: false });
+    assert.match(out.lines[0], /loops don't line up, cut at 60s \(/);
+    assert.ok(out.lines[0].includes("p7") && out.lines[0].includes("p11"), out.lines[0]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

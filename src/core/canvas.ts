@@ -102,6 +102,8 @@ export class Canvas {
   frames = 1;
   /** The loop's length in ms (an anim's, a clocked scene's); 0 when still. */
   loop = 0;
+  /** Inside a scene with `loop: "hold"`: shorter placed anims hold frame 0 once their loop ends instead of wrapping. */
+  hold = false;
   /** Building an anim (frame() items allowed). */
   inAnim = false;
   /** px to an art pixel (a scene's `pixel`, its `sizes`): mesh(), the 3D ops, meshSocket() and post() draw k times as big. */
@@ -358,10 +360,10 @@ export class Canvas {
   }
 
   /** Run `fn` with drawing restricted to `region` (nests by intersection). */
-  clip(region: Region, fn: () => void): void {
+  clip(region: Region, fn: (c: Canvas) => void): void {
     const prev = this.clipPred, p = regionPred(region);
     this.clipPred = prev ? (x, y) => prev(x, y) && p(x, y) : p;
-    try { fn(); } finally { this.clipPred = prev; }
+    try { fn(this); } finally { this.clipPred = prev; }
   }
 
   // ---------------------------------------------------------------- shapes
@@ -582,12 +584,14 @@ export class Canvas {
         }
   }
 
-  /** Apply a color map inside a region `steps` times; density < 1 dithers it. */
-  remap(map: Map<Color, Color>, where?: Region, steps = 1, density = 1): void {
-    const ok = regionPred(where);
+  /** Apply a color map inside a region `steps` times; density < 1 (or `(x, y) => k`) dithers it. */
+  remap(map: Map<Color, Color>, where?: Region, steps = 1, density: number | ((x: number, y: number) => number) = 1): void {
+    const ok = regionPred(where), dyn = typeof density === "function" ? density : undefined, dConst: number = dyn ? 1 : (density as number);
     for (let y = -this.oy; y < this.img.h - this.oy; y++)
       for (let x = -this.ox; x < this.img.w - this.ox; x++) {
-        if (!ok(x, y) || (density < 1 && bayer(x, y) >= density)) continue;
+        if (!ok(x, y)) continue;
+        const d = dyn ? dyn(x, y) : dConst;
+        if (d <= 0 || (d < 1 && bayer(x, y) >= d)) continue;
         const was = this.get(x, y);
         let c = was;
         for (let i = 0; i < steps; i++) c = map.get(c) ?? c;
@@ -597,7 +601,7 @@ export class Canvas {
   }
 
   /** Recolor { m: "M" } inside a region; "*" takes every other opaque color ({ "*": "w" }: hit flash). */
-  recolor(map: Record<string, string>, where?: Region, density = 1): void {
+  recolor(map: Record<string, string>, where?: Region, density: number | ((x: number, y: number) => number) = 1): void {
     const { "*": any, ...rest } = map;
     const m = this.swapMap(rest);
     if (any !== undefined) {
@@ -608,13 +612,13 @@ export class Canvas {
   }
 
   /** Step colors darker along the palette ramps inside a region. */
-  shade(where?: Region, steps = 1, density = 1): void {
+  shade(where?: Region, steps = 1, density: number | ((x: number, y: number) => number) = 1): void {
     this.clashes(-1, where);
     this.remap(this.pal.stepMap(-1), where, steps, density);
   }
 
   /** Step colors lighter along the palette ramps inside a region. */
-  light(where?: Region, steps = 1, density = 1): void {
+  light(where?: Region, steps = 1, density: number | ((x: number, y: number) => number) = 1): void {
     this.clashes(1, where);
     this.remap(this.pal.stepMap(1), where, steps, density);
   }
@@ -1030,10 +1034,23 @@ export class Canvas {
     const [sx, sy] = typeof by === "number" ? [Math.round(by), Math.round(dy)] : by && typeof by.shake === "function" ? by.shake(this.t) : [NaN, NaN];
     if (!Number.isFinite(sx) || !Number.isFinite(sy)) throw new PxError(`shake(spell) or c.shake(dx, dy): a spell, or px to throw the picture, got ${JSON.stringify([by, dy])}`);
     const d = this.img.data, { w, h } = this.img;
-    if (sx || sy) for (const arr of [d, this.img.emit]) {
-      if (!arr) continue;
-      const src = arr.slice();
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) arr[y * w + x] = src[Math.min(h - 1, Math.max(0, y - sy)) * w + Math.min(w - 1, Math.max(0, x - sx))];
+    if (sx || sy) {
+      for (const arr of [d, this.img.emit]) {
+        if (!arr) continue;
+        const src = arr.slice();
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) arr[y * w + x] = src[Math.min(h - 1, Math.max(0, y - sy)) * w + Math.min(w - 1, Math.max(0, x - sx))];
+      }
+      if (this.img.sockets) {
+        for (const k of Object.keys(this.img.sockets)) {
+          const p = this.img.sockets[k];
+          this.img.sockets[k] = [p[0] + sx, p[1] + sy];
+        }
+      }
+      if (this.img.boxes) {
+        for (const k of Object.keys(this.img.boxes)) {
+          this.img.boxes[k] = this.img.boxes[k].map(([bx, by, bw, bh]) => [bx + sx, by + sy, bw, bh]);
+        }
+      }
     }
   }
 
@@ -1215,7 +1232,7 @@ export class Canvas {
       if (s.air !== undefined && typeof s.air !== "boolean") throw new PxError(`mesh: sprite ${k} has air ${JSON.stringify(s.air)}: true when it flies (check doesn't ask its feet to be on the model)`);
       if (s.unlit !== undefined && typeof s.unlit !== "boolean") throw new PxError(`mesh: sprite ${k} has unlit ${JSON.stringify(s.unlit)}: true to draw in its own colors (ignores scene lighting)`);
       if (s.id !== undefined && typeof s.id !== "string") throw new PxError(`mesh: sprite ${k} has id ${JSON.stringify(s.id)}: a name for its sockets ("hero": "hero.hand")`);
-      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, veil: s.veil, light: s.light, air: s.air, unlit: s.unlit,
+      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100), true), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, veil: s.veil, light: s.light, air: s.air, unlit: s.unlit,
         ...(s.light && s.light.color !== undefined ? { tint: this.color(s.light.color) } : {}) };
     });
     // looked up on first use: a palette without ramps has nothing to step (and needs nothing stepped without textures or sprites)
@@ -1337,7 +1354,7 @@ export class Canvas {
       const { tex: name, texel = 1, at = [0, 0], ...rest } = fn;
       if (typeof name !== "string" || !(texel > 0) || !(Array.isArray(at) && at.length === 2 && at.every(Number.isFinite)) || Object.keys(rest).length)
         throw new PxError(`plane: the ground is (x, z, col, row) => key, or a drawn asset laid on it { tex: "name", texel (m a pixel, default 1), at: [x, z] (its top left, default [0, 0]) }, got ${JSON.stringify(fn)}`);
-      const T = this.asset(name), [ax, az] = at;
+      const T = this.asset(name, {}, 0, 0, true), [ax, az] = at;
       tex = (x, z) => {
         const u = Math.floor((x - ax) / texel), v = Math.floor((az - z) / texel);
         if (u < 0 || v < 0 || u >= T.w || v >= T.h) return null;
@@ -1388,13 +1405,18 @@ export class Canvas {
     if (on !== undefined && typeof on !== "string") throw new PxError(`effect "${name}": on is keys ("Yy", "*" any opaque), got ${JSON.stringify(on)}`);
     const out = runEffect(name, this.img, own, { frame: this.frame, frames: this.frames, seed: this.seed, ox: this.ox, oy: this.oy, pal: this.pal, wrap: this.wrap, asset: (n) => this.asset(n) });
     // what moved pixels (distort, sway) moved their normals and their light too; emit gives light
-    const n = out.norm && this.img.norm, e = out.emit && (this.img.emit ??= new Uint8Array(this.img.w * this.img.h));
     if (where === undefined && on === undefined && !this.clipPred) {
+      if (out.w !== this.img.w || out.h !== this.img.h) {
+        this.img = out;
+        return;
+      }
+      const n = out.norm && this.img.norm, e = out.emit && (this.img.emit ??= new Uint8Array(this.img.w * this.img.h));
       this.img.data.set(out.data);
       if (n) n.set(out.norm!);
       if (e) e.set(out.emit!);
       return;
     }
+    const n = out.norm && this.img.norm, e = out.emit && (this.img.emit ??= new Uint8Array(this.img.w * this.img.h));
     const ok = regionPred(where as Region), keys = this.maskAt(on);
     for (let y = -this.oy; y < this.img.h - this.oy; y++)
       for (let x = -this.ox; x < this.img.w - this.ox; x++) {
@@ -1474,8 +1496,8 @@ export class Canvas {
 
   // ---------------------------------------------------------------- assets
 
-  /** Pick one candidate of `name` and transform it; random choices seeded by (a, b), or by its id: moved, it keeps its look. */
-  asset(name: string, opts: PlaceOpts = {}, a = 0, b = 0): Img {
+  /** Pick one candidate of `name` and transform it; random choices seeded by (a, b), or by its id: moved, it keeps its look. Direct calls default to `join = false` (read-only: won't join an anim's loop to this canvas's clock); placement ops pass `join = true`. */
+  asset(name: string, opts: PlaceOpts = {}, a = 0, b = 0, join = false): Img {
     if (typeof opts.id === "string") { a = [...opts.id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7); b = 0; }
     const list = this.res.candidates(name);
     const r = rng(hash(a, b, (opts.seed ?? 0) + this.seed));
@@ -1489,11 +1511,11 @@ export class Canvas {
       // of a group (sizes of one thing), the member whose drawing is nearest that height, the smaller
       // on a tie: a figure far down a road takes the sprite drawn for its size
       if (!(Number.isFinite(opts.fit) && opts.fit > 0)) throw new PxError(`fit is the height in px to pick the member of '${name}' by, got ${JSON.stringify(opts.fit)}`);
-      const tall = (m: string) => { const im = this.res.image(m, inner); return im.bounds()?.h ?? im.h; };
+      const tall = (m: string) => { const im = this.res.image(m, inner, 0, false); return im.bounds()?.h ?? im.h; };
       pick = list.map((m) => [m, tall(m)] as const).reduce((a, b) => (Math.abs(b[1] - opts.fit!) < Math.abs(a[1] - opts.fit!) || (Math.abs(b[1] - opts.fit!) === Math.abs(a[1] - opts.fit!) && b[1] < a[1]) ? b : a))[0];
     }
-    let t = this.t, track = true;
-    if (opts.frame !== undefined || opts.t !== undefined || opts.delay || opts.rdelay) {
+    let t = this.t, track = join;
+    if (opts.frame !== undefined || opts.t !== undefined || opts.delay || opts.rdelay || this.hold) {
       const tl = this.res.timeline(pick, inner);
       if (opts.t !== undefined && !Number.isFinite(opts.t)) throw new PxError(`t is ms into the anim's own loop, got ${JSON.stringify(opts.t)}`);
       if (tl) {
@@ -1504,7 +1526,8 @@ export class Canvas {
           // Shifts snap to the anim's step so combined timelines stay on a frame grid.
           let d = opts.delay ?? 0;
           if (opts.rdelay) d += rng(hash(a, b, (opts.seed ?? 0) + this.seed + 7919))() * tl.loop;
-          t += Math.round(d / tl.step) * tl.step;
+          if (d) t += Math.round(d / tl.step) * tl.step;
+          if (this.hold && t >= tl.loop) t = 0;
         }
       }
     }
@@ -1657,7 +1680,7 @@ export class Canvas {
     let rel: Rel | undefined;
     if (opts && RELATIONS.some((k) => opts![k] !== undefined)) ({ x, y, rel } = this.related(name, opts, x, y));
     if (opts?.cast && typeof opts.cast === "object" && !Array.isArray(opts.cast)) opts = { ...opts, cast: castAt(opts.cast, x, y) };
-    const src = this.asset(name, opts, x, y), [px, py] = src.pivot ?? [0, 0], X = x, Y = y, o = opts;
+    const src = this.asset(name, opts, x, y, true), [px, py] = src.pivot ?? [0, 0], X = x, Y = y, o = opts;
     // (what a relation reads of it: where it stands now, and its drawing at its own frame 0, a shadow's
     // copy as the thing it's of: what walks by carries its followers, flames that flicker shake none)
     let body: Img | undefined;
@@ -1883,20 +1906,20 @@ export class Canvas {
   }
 
   tile(name: string, x: number, y: number, cols = 1, rows = 1, opts?: PlaceOpts): void {
-    const step = this.res.image(this.res.candidates(name)[0], 0);
+    const step = this.res.image(this.res.candidates(name)[0], 0, 0, false);
     for (let r = 0; r < rows; r++)
       for (let c = 0; c < cols; c++) {
         const tx = x + c * step.w, ty = y + r * step.h;
-        this.put(this.asset(name, opts, tx, ty), tx, ty);
+        this.put(this.asset(name, opts, tx, ty, true), tx, ty);
       }
   }
 
   /** Tile `name` over an area; edge tiles are cut to fit. */
   pattern(name: string, x: number, y: number, w: number, h: number, opts?: PlaceOpts): void {
-    const step = this.res.image(this.res.candidates(name)[0], 0);
+    const step = this.res.image(this.res.candidates(name)[0], 0, 0, false);
     for (let ty = y; ty < y + h; ty += step.h)
       for (let tx = x; tx < x + w; tx += step.w) {
-        let src = this.asset(name, opts, tx, ty);
+        let src = this.asset(name, opts, tx, ty, true);
         const cw = Math.min(src.w, x + w - tx), ch = Math.min(src.h, y + h - ty);
         if (cw < src.w || ch < src.h) src = src.sub(0, 0, cw, ch);
         this.put(src, tx, ty);
@@ -1908,7 +1931,7 @@ export class Canvas {
    * center repeat (never stretch, so pixels keep their shape).
    */
   panel(name: string, x: number, y: number, w: number, h: number, opts?: PlaceOpts): void {
-    const src = this.asset(name, opts, x, y);
+    const src = this.asset(name, opts, x, y, true);
     if (!src.slice) throw new PxError(`panel: '${name}' has no slice margins: give it { slice: n } or { slice: [left, top, right, bottom] }`);
     const [l, t, r, b] = src.slice, cw = src.w - l - r, ch = src.h - t - b;
     w = Math.floor(w); h = Math.floor(h);
@@ -1920,32 +1943,54 @@ export class Canvas {
     this.put(out, x, y);
   }
 
+  /** Frame metadata set via `c.setData(...)` on an asset (without joining an anim's loop to this canvas's clock). */
+  data(name: string, frame?: number): Record<string, unknown> | undefined {
+    const pick = this.res.candidates(name)[0];
+    let t = 0;
+    if (frame !== undefined) {
+      if (!Number.isInteger(frame) || frame < 0) throw new PxError(`c.data(name, frame): frame must be a non-negative integer, got ${JSON.stringify(frame)}`);
+      const tl = this.res.timeline(pick, this.seed);
+      if (tl) t = frameStart(tl, frame);
+    }
+    const img = this.res.image(pick, this.seed, t, false);
+    return img.info ? { ...img.info } : undefined;
+  }
+
   /** Character map of tiles: tilemap(`gg\ndd`, { map: { g: "grass" }, size: 16 }). */
   tilemap(str: string, opts: TilemapOpts): void {
     if (typeof str !== "string") throw new PxError("tilemap(str, { map, size }) needs the map string first");
     if (!opts?.map) throw new PxError("tilemap needs { map: { char: assetName } }");
-    if (opts.corners) {
-      return this.tilemap(...cornerTiles(str, opts, (n) => this.res.has(n)));
-    }
-    if (typeof opts.map === "string") throw new PxError(`tilemap: map "${opts.map}" as a name prefix needs { corners: ... }; a tile map takes { map: { char: assetName } }`);
-    const map = opts.map;
-    const rows = gridRows(str);
+    if (opts.corners && opts.sides) throw new PxError("tilemap: give either corners or sides, not both");
     const x0 = opts.x ?? 0, y0 = opts.y ?? 0;
-    if (opts.iso && !(opts.w && opts.h)) throw new PxError("tilemap { iso: true } needs the floor diamond's size: { w: 32, h: 16 }");
-    const cells: { r: number; i: number; name: string }[] = [];
-    rows.forEach((row, r) => {
-      [...row].forEach((ch, i) => {
-        if (ch === "." || ch === " ") return;
-        const name = map[ch];
-        if (!name) throw new PxError(`tilemap: no tile for '${ch}' (row ${r}, col ${i}); map has: ${Object.keys(map).join(" ")}`);
-        cells.push({ r, i, name });
+    let cells: { r: number; i: number; name: string }[] = [], cols = 0, rowCount = 0;
+    if (opts.corners) {
+      const r = cornerTiles(str, opts, (n) => this.res.has(n));
+      cells = r.cells; cols = r.cols; rowCount = r.rows;
+    } else if (opts.sides) {
+      const r = sideTiles(str, opts, (n) => this.res.has(n));
+      cells = r.cells; cols = r.cols; rowCount = r.rows;
+    } else {
+      if (typeof opts.map === "string") throw new PxError(`tilemap: map "${opts.map}" as a name prefix needs { corners: ... } or { sides: ... }; a tile map takes { map: { char: assetName } } or (ch, col, row) => assetName`);
+      const map = opts.map, rows = gridRows(str);
+      rowCount = rows.length;
+      cols = Math.max(0, ...rows.map((row) => [...row].length));
+      if (opts.iso && !(opts.w && opts.h)) throw new PxError("tilemap { iso: true } needs the floor diamond's size: { w: 32, h: 16 }");
+      rows.forEach((row, r) => {
+        [...row].forEach((ch, i) => {
+          if (ch === "." || ch === " ") return;
+          const name = typeof map === "function" ? map(ch, i, r) : map[ch];
+          if (!name) {
+            if (typeof map === "function") return;
+            throw new PxError(`tilemap: no tile for '${ch}' (row ${r}, col ${i}); map has: ${Object.keys(map).join(" ")}`);
+          }
+          cells.push({ r, i, name });
+        });
       });
-    });
+    }
     // Record what lands in each cell, for exporting the map (Tiled).
-    const cols = Math.max(0, ...rows.map((row) => [...row].length));
     const first = cells.length ? this.res.image(this.res.candidates(cells[0].name)[0], 0, 0, false) : undefined;
-    const layer: TileLayer = { name: this.layerName ?? "tilemap", iso: !!opts.iso, cols, rows: rows.length,
-      tw: opts.w ?? opts.size ?? first?.w ?? 0, th: opts.h ?? opts.size ?? first?.h ?? 0, x: x0, y: y0, cells: new Array(cols * rows.length) };
+    const layer: TileLayer = { name: this.layerName ?? "tilemap", iso: !!opts.iso, cols, rows: rowCount,
+      tw: opts.w ?? opts.size ?? first?.w ?? 0, th: opts.h ?? opts.size ?? first?.h ?? 0, x: x0, y: y0, cells: new Array(cols * rowCount) };
     this.maps?.push(layer);
     if (opts.iso) {
       // Columns run down-right, rows down-left; back to front, so nearer tiles cover farther ones.
@@ -1954,7 +1999,7 @@ export class Canvas {
       const w = opts.w!, h = opts.h!;
       cells.sort((a, b) => a.i + a.r - (b.i + b.r) || a.r - b.r);
       for (const { r, i, name } of cells) {
-        const tx = x0 + ((i - r) * w) / 2, ty = y0 + ((i + r) * h) / 2, src = this.asset(name, opts, tx, ty);
+        const tx = x0 + ((i - r) * w) / 2, ty = y0 + ((i + r) * h) / 2, src = this.asset(name, opts, tx, ty, true);
         layer.cells[r * cols + i] = src;
         if (src.pivot) this.putAt(src, tx + w / 2, ty + h / 2, [0, 0]);
         else this.put(src, tx, ty);
@@ -1962,9 +2007,9 @@ export class Canvas {
       return;
     }
     for (const { r, i, name } of cells) {
-      const step = opts.w && opts.h ? null : this.res.image(this.res.candidates(name)[0], 0);
+      const step = opts.w && opts.h ? null : this.res.image(this.res.candidates(name)[0], 0, 0, false);
       const tx = x0 + i * (opts.w ?? opts.size ?? step!.w), ty = y0 + r * (opts.h ?? opts.size ?? step!.h);
-      const src = this.asset(name, opts, tx, ty);
+      const src = this.asset(name, opts, tx, ty, true);
       layer.cells[r * cols + i] = src;
       this.put(src, tx, ty);
     }
@@ -2005,7 +2050,7 @@ export class Canvas {
       const cells = [...grid(lo).values()], n = Math.min(count, cells.length);
       for (let i = 0; i < n; i++) {
         const l = cells[Math.floor((i * cells.length) / n)], k = l[Math.floor(r() * l.length)];
-        this.place(this.asset(name, opts, xs[k], ys[k]), xs[k], ys[k], [0.5, 0.5], opts.clip ? on : undefined, 0, name);
+        this.place(this.asset(name, opts, xs[k], ys[k], true), xs[k], ys[k], [0.5, 0.5], opts.clip ? on : undefined, 0, name);
         placed++;
       }
       tries = count * 30;
@@ -2018,7 +2063,7 @@ export class Canvas {
           for (let t = 0; t < 30; t++) {
             const cx = x + Math.floor(((i + r()) * w) / cols), cy = y + Math.floor(((j + r()) * h) / rows);
             if (!ok(cx, cy)) continue;
-            this.place(this.asset(name, opts, cx, cy), cx, cy, [0.5, 0.5], opts.clip ? on : undefined, 0, name);
+            this.place(this.asset(name, opts, cx, cy, true), cx, cy, [0.5, 0.5], opts.clip ? on : undefined, 0, name);
             placed++;
             break;
           }
@@ -2028,7 +2073,7 @@ export class Canvas {
       tries++;
       const cx = x + Math.floor(r() * w), cy = y + Math.floor(r() * h);
       if (!ok(cx, cy)) continue;
-      this.place(this.asset(name, opts, cx, cy), cx, cy, [0.5, 0.5], opts.clip ? on : undefined, 0, name);
+      this.place(this.asset(name, opts, cx, cy, true), cx, cy, [0.5, 0.5], opts.clip ? on : undefined, 0, name);
       placed++;
     }
     // A brush that silently paints nothing is the usual sign of an empty layer under `on`.
@@ -2037,10 +2082,21 @@ export class Canvas {
         (opts.below || !this.layerName ? "" : "; a layer starts empty: add below: true to read the layers under it"));
   }
 
-  /** Grid string at (x, y): one char per pixel; "." keeps, "_" erases. */
-  grid(x: number, y: number, s: string): void {
-    gridRows(String(s)).forEach((row, r) => {
-      [...row].forEach((ch, i) => {
+  /** Grid string at (x, y): one char per pixel; "." keeps, "_" erases; optional `{ flip: "x" | "y" | "xy" }`. */
+  grid(x: number, y: number, s: string, opts?: { flip?: "x" | "y" | "xy" }): void {
+    const flip = opts?.flip;
+    if (flip !== undefined && flip !== "x" && flip !== "y" && flip !== "xy")
+      throw new PxError(`grid: flip must be "x", "y" or "xy", got ${JSON.stringify(flip)}`);
+    const raw = gridRows(String(s));
+    const maxW = flip === "x" || flip === "xy" ? Math.max(0, ...raw.map((r) => [...r].length)) : 0;
+    const rows = flip === "y" || flip === "xy" ? raw.slice().reverse() : raw;
+    rows.forEach((row, r) => {
+      const chars = [...row];
+      if (flip === "x" || flip === "xy") {
+        while (chars.length < maxW) chars.push(".");
+        chars.reverse();
+      }
+      chars.forEach((ch, i) => {
         if (ch === "." || ch === " ") return;
         let c: Resolved;
         try { c = this.color(ch); } catch (e) {
@@ -2111,7 +2167,7 @@ export class Canvas {
     for (let d = opts.start ?? Math.floor(every / 2); d < span; d += every) {
       const [, fy] = at(d / span);
       const hx = x0 + dir * d, hy = Math.round(fy);
-      const src = this.asset(opts.hang, opts, hx, hy);
+      const src = this.asset(opts.hang, opts, hx, hy, true);
       this.putAt(src, hx, hy + 1, [0.5, 0], undefined, opts.hang);
     }
   }
@@ -2361,28 +2417,60 @@ function inHue(c: Color, [from, to]: [number, number]): boolean {
  * (1 top-left + 2 top-right + 4 bottom-left + 8 bottom-right) as one hex char, "." where no tile.
  * A prefix map names <prefix><mask>; a mask with no such asset is an error, except 0 (left empty).
  */
-function cornerTiles(str: string, opts: TilemapOpts, known: (name: string) => boolean): [string, TilemapOpts] {
+function cornerTiles(str: string, opts: TilemapOpts, known: (name: string) => boolean): { cells: { r: number; i: number; name: string }[]; cols: number; rows: number } {
   if (opts.iso) throw new PxError("tilemap: corners work on the square grid only, not with iso");
   const rows = gridRows(str).map((r) => [...r]);
   const set = (ch: string | undefined) => ch !== undefined && (opts.corners === true ? ch !== "." && ch !== " " : (opts.corners as string).includes(ch));
-  const name = (m: number) => (typeof opts.map === "string" ? (known(opts.map + m) ? opts.map + m : undefined) : opts.map[m]);
-  const map: Record<string, string> = {}, out: string[] = [];
+  const resolve = (m: number, i: number, j: number) =>
+    typeof opts.map === "function" ? opts.map(m, i, j) ?? undefined
+      : typeof opts.map === "string" ? (known(opts.map + m) ? opts.map + m : undefined)
+      : opts.map[m];
+  const cells: { r: number; i: number; name: string }[] = [];
+  let cols = 0;
+  const rowCount = Math.max(0, rows.length - 1);
   for (let j = 0; j + 1 < rows.length; j++) {
-    let line = "";
-    for (let i = 0; i + 1 < Math.max(rows[j].length, rows[j + 1].length); i++) {
+    const w = Math.max(0, Math.max(rows[j].length, rows[j + 1].length) - 1);
+    if (w > cols) cols = w;
+    for (let i = 0; i < w; i++) {
       const m = (set(rows[j][i]) ? 1 : 0) | (set(rows[j][i + 1]) ? 2 : 0) | (set(rows[j + 1][i]) ? 4 : 0) | (set(rows[j + 1][i + 1]) ? 8 : 0);
-      const n = name(m);
+      const n = resolve(m, i, j);
       if (!n) {
-        if (m === 0) { line += "."; continue; }
+        if (m === 0 || typeof opts.map === "function") continue;
         const which = CORNER_NAMES.filter((_, b) => m & (1 << b)).join(" + ");
         throw new PxError(`tilemap: no tile for corner mask ${m} (${which} set) at tile row ${j}, col ${i}; map has: ${typeof opts.map === "string" ? opts.map + "<mask>" : Object.keys(opts.map).join(" ")}`);
       }
-      map[m.toString(16)] = n;
-      line += m.toString(16);
+      cells.push({ r: j, i, name: n });
     }
-    out.push(line);
   }
-  return [out.join("\n"), { ...opts, corners: undefined, map }];
+  return { cells, cols, rows: rowCount };
+}
+
+const SIDE_NAMES = ["N", "E", "S", "W"];
+function sideTiles(str: string, opts: TilemapOpts, known: (name: string) => boolean): { cells: { r: number; i: number; name: string }[]; cols: number; rows: number } {
+  if (opts.iso) throw new PxError("tilemap: sides work on the square grid only, not with iso");
+  const rows = gridRows(str).map((r) => [...r]);
+  const set = (ch: string | undefined) => ch !== undefined && (opts.sides === true ? ch !== "." && ch !== " " : (opts.sides as string).includes(ch));
+  const resolve = (m: number, i: number, j: number) =>
+    typeof opts.map === "function" ? opts.map(m, i, j) ?? undefined
+      : typeof opts.map === "string" ? (known(opts.map + m) ? opts.map + m : undefined)
+      : opts.map[m];
+  const cells: { r: number; i: number; name: string }[] = [];
+  const cols = Math.max(0, ...rows.map((r) => r.length));
+  for (let j = 0; j < rows.length; j++) {
+    for (let i = 0; i < rows[j].length; i++) {
+      if (!set(rows[j][i])) continue;
+      // Open sides bitmask: 1 N (top open), 2 E (right open), 4 S (bottom open), 8 W (left open)
+      const m = (!set(rows[j - 1]?.[i]) ? 1 : 0) | (!set(rows[j]?.[i + 1]) ? 2 : 0) | (!set(rows[j + 1]?.[i]) ? 4 : 0) | (!set(rows[j]?.[i - 1]) ? 8 : 0);
+      const n = resolve(m, i, j);
+      if (!n) {
+        if (typeof opts.map === "function") continue;
+        const which = SIDE_NAMES.filter((_, b) => m & (1 << b)).join(" + ") || "none";
+        throw new PxError(`tilemap: no tile for open-side mask ${m} (${which} open) at tile row ${j}, col ${i}; map has: ${typeof opts.map === "string" ? opts.map + "<mask>" : Object.keys(opts.map).join(" ")}`);
+      }
+      cells.push({ r: j, i, name: n });
+    }
+  }
+  return { cells, cols, rows: rows.length };
 }
 
 /** Does any pixel of the area pass the mask? */

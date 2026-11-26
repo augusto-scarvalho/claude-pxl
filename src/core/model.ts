@@ -157,8 +157,8 @@ export interface AssetOpts {
   ms?: number | number[];
   /** anim: frame count when there are no frame() items (procedural, via c.frame / c.phase). */
   frames?: number;
-  /** anim: false = play once and hold the last frame (default true). */
-  loop?: boolean;
+  /** anim: false = play once and hold the last frame (default true). scene: "longest" (play to longest anim, shorter repeat) or "hold" (each plays once, holds frame 0 to longest). */
+  loop?: boolean | "longest" | "hold";
   /** anim: playback direction, as Aseprite tags have it (default "forward"). */
   dir?: "forward" | "reverse" | "pingpong";
   /** Which way it faces as drawn: "right", "left", "front" (toward us) or "back". Flips and turns follow it; describe reports it. */
@@ -240,6 +240,8 @@ export interface Timeline {
   once?: boolean;
   /** The placed anims' loops don't line up: their combined loop was cut at the 60s maximum. */
   capped?: boolean;
+  /** The placed anims whose loops didn't line up (when `capped` is true), e.g. `idle (160 ms), cast (140 ms)`. */
+  cappedBy?: string;
   /** Its loop runs to many frames because what it plays doesn't divide (1000 ms and 880 ms: 22 s): which, in words. */
   long?: string;
 }
@@ -405,13 +407,18 @@ export interface ScatterOpts extends PlaceOpts {
 }
 
 export interface TilemapOpts extends PlaceOpts {
-  /** char -> asset; with `corners`, corner mask (0-15) -> asset, or a prefix ("shore_" -> shore_<mask>). */
-  map: Record<string, string> | string;
+  /** char -> asset; with `corners` or `sides`, mask (0-15) -> asset, prefix ("shore_" -> shore_<mask>), or `(maskOrCh, col, row) => assetName | null`. */
+  map: Record<string, string> | string | ((key: number | string, col: number, row: number) => string | null | undefined);
   /**
    * The map marks tile corners, not tiles: these chars (true: any but "." and " ") are set. Each
    * tile's mask is 1 top-left + 2 top-right + 4 bottom-left + 8 bottom-right.
    */
   corners?: boolean | string;
+  /**
+   * The map marks solid tiles, and each solid cell's mask is its open sides: 1 N + 2 E + 4 S + 8 W
+   * (companion to `sides()`). True treats any char except "." and " " as solid.
+   */
+  sides?: boolean | string;
   /** Isometric: cells on a diamond grid of w x h floors, drawn back to front. */
   iso?: boolean;
   size?: number;

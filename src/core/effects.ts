@@ -95,7 +95,24 @@ function at(img: Img, x: number, y: number, wrap?: { x: boolean; y: boolean }): 
  * Pixels moved as warp() moves them: each place takes the pixel `from` names (an index, -1 for the
  * clear), its normal along with it, so a normal map lights what moved as it lit it before.
  */
-function moved(src: Img, from: (px: number, py: number, i: number) => number): Img {
+function padHoriz(src: Img, pad: number): Img {
+  if (pad <= 0) return src;
+  const o = new Img(src.w + 2 * pad, src.h);
+  o.blit(src, pad, 0);
+  if (src.norm) {
+    const dst = o.normals();
+    for (let y = 0; y < src.h; y++) dst.set(src.norm.subarray(y * src.w * 3, (y + 1) * src.w * 3), (y * o.w + pad) * 3);
+  }
+  if (src.emit) {
+    const dst = (o.emit = new Uint8Array(o.w * o.h));
+    for (let y = 0; y < src.h; y++) dst.set(src.emit.subarray(y * src.w, (y + 1) * src.w), y * o.w + pad);
+  }
+  src.movePivot(o, (x, y) => [x + pad, y]);
+  if (src.lamps) o.lamps = src.lamps.map((l) => ({ ...l, x: l.x + pad }));
+  return o;
+}
+
+function moved(src: Img, from: (px: number, py: number, i: number) => number, keepMeta = false): Img {
   const out = new Img(src.w, src.h), n = src.norm, on = n ? (out.norm = new Int8Array(n.length)) : undefined;
   const e = src.emit, oe = e ? (out.emit = new Uint8Array(e.length)) : undefined;
   for (let py = 0, i = 0; py < src.h; py++)
@@ -106,6 +123,10 @@ function moved(src: Img, from: (px: number, py: number, i: number) => number): I
       if (on) { on[3 * i] = n![3 * j]; on[3 * i + 1] = n![3 * j + 1]; on[3 * i + 2] = n![3 * j + 2]; }
       if (oe) oe[i] = e![j];
     }
+  if (keepMeta) {
+    src.movePivot(out, (x, y) => [x, y]);
+    if (src.lamps) out.lamps = src.lamps.map((l) => ({ ...l }));
+  }
   return out;
 }
 
@@ -478,33 +499,55 @@ export const EFFECTS: Record<string, Effect> = {
   sway: {
     params: { amount: num(1.5, -64, 64), lean: num(0.5, 0, 1), power: num(2, 0.25, 8), still: num(0, 0), cycles: num(1, 1, 64, true), flutter: num(0, 0, 16), vary: num(0.25, 0, 1),
       push: num(NaN, -4096, 4096), reach: num(6, 1, 256), bend: num(3, -64, 64), pixel: PIXEL,
+      lag: num(0, -4, 4),
+      pad: (v, what) => {
+        if (v === undefined || v === false) return 0;
+        if (v === true) return -1;
+        if (typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 256) return v;
+        throw new PxError(`${what} is true (auto) or a non-negative whole number of pixels, got ${JSON.stringify(v)}`);
+      },
+      profile: (v, what) => { if (v !== undefined && typeof v !== "function") throw new PxError(`${what} is (phase) => offset (-1..1), got ${JSON.stringify(v)}`); return v; },
       mask: (v, what) => { if (v !== undefined && typeof v !== "string") throw new PxError(`${what} is an asset's name, got ${JSON.stringify(v)}`); return v; } },
-    run(src, p, x) {
+    run(rawSrc, p, x) {
       const r = rng(hash(x.seed, 3, 11)), start = p.vary * r(), far = 1 + p.vary * (2 * r() - 1), K: number = p.pixel;
-      const th = 2 * Math.PI * (p.cycles * turn(x) + start), s = p.lean + (1 - p.lean) * Math.sin(th);
+      const padPx = p.pad === -1 ? Math.ceil((Math.abs(p.amount) * (1 + p.vary) + Math.abs(p.flutter)) * K) : (p.pad as number);
+      const src = padPx > 0 ? padHoriz(rawSrc, padPx) : rawSrc;
+      const keepMeta = padPx > 0;
+      const phase0 = p.cycles * turn(x) + start;
+      const evalProfile = (ph: number): number => {
+        if (p.profile) {
+          const val = (p.profile as (phase: number) => number)(((ph % 1) + 1) % 1);
+          if (typeof val !== "number" || !Number.isFinite(val)) throw new PxError(`effect "sway": profile(phase) must return a finite number, got ${JSON.stringify(val)}`);
+          return val;
+        }
+        return p.lean + (1 - p.lean) * Math.sin(2 * Math.PI * ph);
+      };
       const base = Math.round(src.pivot?.[1] ?? src.h), top = Math.max(1, Math.floor((base - 1) / K) - p.still);
       const row = new Int32Array(src.h), wt = new Float64Array(src.h), by = new Float64Array(src.h);
       for (let py = 0; py < src.h; py++) {
-        const up = Math.floor((base - 1 - py) / K) - p.still, w = up <= 0 ? 0 : Math.min(1, up / top) ** p.power;
+        const up = Math.floor((base - 1 - py) / K) - p.still, frac = up <= 0 ? 0 : Math.min(1, up / top), w = frac ** p.power;
+        const ph = phase0 - (p.lag as number) * frac, th = 2 * Math.PI * ph, s = evalProfile(ph);
         by[py] = p.amount * far * s + p.flutter * Math.sin(2 * th + 0.3 * up);
         row[py] = K * Math.round(w * by[py]);
         wt[py] = w;
       }
       if (p.mask) {
         if (!x.asset) throw new PxError('effect "sway": mask needs the name of an asset of the same size, drawn where an asset is');
-        const m = x.asset(p.mask), lum = (c: number) => (c === TRANSPARENT ? 0 : (0.2126 * (c >>> 24) + 0.7152 * ((c >>> 16) & 255) + 0.0722 * ((c >>> 8) & 255)) / 255);
-        return moved(src, (px, py, i) => { const d = K * Math.round(lum(m.get(px, py)) * by[py]); return d ? at(src, px - d, py, x.wrap) : i; });
+        const m = padPx > 0 ? padHoriz(x.asset(p.mask), padPx) : x.asset(p.mask);
+        const lum = (c: number) => (c === TRANSPARENT ? 0 : (0.2126 * (c >>> 24) + 0.7152 * ((c >>> 16) & 255) + 0.0722 * ((c >>> 8) & 255)) / 255);
+        return moved(src, (px, py, i) => { const d = K * Math.round(lum(m.get(px, py)) * by[py]); return d ? at(src, px - d, py, x.wrap) : i; }, keepMeta);
       }
-      if (!Number.isFinite(p.push)) return moved(src, (px, py, i) => (row[py] ? at(src, px - row[py], py, x.wrap) : i));
+      if (!Number.isFinite(p.push)) return moved(src, (px, py, i) => (row[py] ? at(src, px - row[py], py, x.wrap) : i), keepMeta);
       // the stems near what passes through, bent away from it: each row's pixels carried out, where
       // each lands the one taken from (the farthest first, so the nearest, pushed, lands over them)
-      const W = src.w, from = new Int32Array(W * src.h).fill(-1), order = [...Array(W).keys()].sort((a, b) => Math.abs(b + 0.5 - p.push) - Math.abs(a + 0.5 - p.push));
+      const pushX = p.push + padPx;
+      const W = src.w, from = new Int32Array(W * src.h).fill(-1), order = [...Array(W).keys()].sort((a, b) => Math.abs(b + 0.5 - pushX) - Math.abs(a + 0.5 - pushX));
       for (let py = 0; py < src.h; py++)
         for (const px of order) {
-          const d = (px + 0.5 - p.push) / K, to = px + (Math.abs(d) < p.reach ? K * Math.round(Math.sign(d) * p.bend * (1 - Math.abs(d) / p.reach) * wt[py]) : 0), j = py * W + to;
+          const d = (px + 0.5 - pushX) / K, to = px + (Math.abs(d) < p.reach ? K * Math.round(Math.sign(d) * p.bend * (1 - Math.abs(d) / p.reach) * wt[py]) : 0), j = py * W + to;
           if (to >= 0 && to < W && (from[j] < 0 || src.data[py * W + px] !== TRANSPARENT)) from[j] = py * W + px;
         }
-      return moved(src, (px, py, i) => { const j = row[py] ? at(src, px - row[py], py, x.wrap) : i; return j < 0 ? -1 : from[j]; });
+      return moved(src, (px, py, i) => { const j = row[py] ? at(src, px - row[py], py, x.wrap) : i; return j < 0 ? -1 : from[j]; }, keepMeta);
     },
   },
   /**

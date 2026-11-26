@@ -759,7 +759,7 @@ const ROCKS = (() => {
 // knotted (short lengths, the radius swelling and narrowing), charcoal round (shaded as a log lying in
 // the light from the fires behind), cracks glowing across it, broken branches sticking up; splintered
 // ends at each break and at the top; a torn-up root plate at the foot.
-function log(c, L, frame) {
+function fallenLog(c, L, frame) {
   const ca = Math.cos(L.a), sa = Math.sin(L.a), r = rng(L.seed * 17), breaks = L.breaks ?? []
   const pt = (f, piece) => { const side = 0.35 * Math.sin(f * 4 + L.seed) + piece * 0.3, x = L.x + ca * L.len * f - sa * side, z = L.z + sa * L.len * f + ca * side; return [x, z, height(x, z) + L.r * 0.9 - piece * 0.05] }
   const rad = (f) => L.r * (1 - 0.2 * (f + 0.5)) * (1 + 0.14 * (vnoise(f * 7 + L.seed, 3) - 0.5) * 2)
@@ -850,7 +850,7 @@ anim("extinction", { w: W, h: H, frames: FRAMES, fps: FPS, world: { light: [0, -
   c.sort("z", () => {
     TREES.forEach((T, i) => c.z(-T.d, () => { c.stamp("_tree" + i, 0, 0); treeFire(c, T, c.frame) }))
     for (const m of [...runners(c), ...flyers(c.frame)]) c.z(-m.d, () => (m.sprite ? c.stamp(m.sprite, m.x, m.y) : c.as(m.name, () => m.draw(c))))
-    for (const L of LOGS) c.z(-Math.hypot(L.x, L.z), () => c.as("log", () => log(c, L, c.frame)))
+    for (const L of LOGS) c.z(-Math.hypot(L.x, L.z), () => c.as("log", () => fallenLog(c, L, c.frame)))
     for (const S of SNAGS) c.z(-Math.hypot(S.x, S.z), () => c.as("snag", () => snag(c, S, c.frame)))
     for (const R of ROCKS) c.z(-Math.hypot(R.x, R.z), () => c.as("rock", () => rock(c, R)))
   })

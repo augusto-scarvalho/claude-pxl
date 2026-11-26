@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { art, failure, keys, PAL } from "./helpers.ts";
 import { perspective, road, side } from "../src/core/perspective.ts";
 import { bayer, fbm, latticeHash, seamless, vec, vnoise } from "../src/core/util.ts";
-import { loadSource } from "../src/node/load.ts";
+import { loadProject, loadSource } from "../src/node/load.ts";
 import { compareSilhouettes, packSheet, playAll, preview, sheetJson } from "../src/core/render.ts";
 import { TRANSPARENT, pack } from "../src/core/color.ts";
 import { readJoints, readMotion, sideColor } from "../src/core/pose.ts";
@@ -1156,4 +1159,58 @@ sprite("g2", { w: 2, h: 2 }, rect(0, 0, 2, 2, "g"))
     c.y(2, 5, () => c.rect(1, 1, 2, 2, "r"));
     c.y(2, 1, () => c.rect(1, 1, 2, 2, "g"));
   }))`, "s"), "....\n.rr.\n.rr.\n....");
+});
+
+test("Wave A+B canvas & tileset ergonomics: shake sockets/boxes, corners 5th mask arg, sides()+tilemap, functional map, c.clip(c), grid flip, sprite bg, own(), c.data(), spatial density", () => {
+  // 1. c.shake shifts sockets and boxes with pixels
+  const pShake = loadSource(PAL + `sprite("sh", { w: 8, h: 8, sockets: { tip: [2, 3] } }, (c) => {
+    c.px(2, 3, "r"); c.setBox("hit", 1, 2, 2, 2); c.shake(2, -1);
+  })`, "t.px.js");
+  const shIm = pShake.image("sh");
+  assert.equal(shIm.get(4, 2), pShake.pal.resolve("r"), "pixel shifted by shake");
+  assert.deepEqual(shIm.sockets?.tip, [4, 2], "socket shifted by shake");
+  assert.deepEqual(shIm.boxes?.hit, [[3, 1, 2, 2]], "box shifted by shake");
+
+  // 2. corners() 5th arg mask, sides() + tilemap({ sides }), and functional tilemap({ map: (k, col, row) => ... })
+  const pTiles = loadSource(PAL + `
+let masks = new Set()
+corners("c", { size: 2 }, (_x, _y, _t, _v, mask) => { masks.add(mask); return mask === 15 ? "g" : "r" })
+sides("s", { size: 3 }, (_x, _y, open, dist) => dist.edge === 0 ? "w" : open.n || open.s || open.e || open.w ? "g" : "r")
+scene("map_sides", { w: 9, h: 3 }, tilemap("###", { sides: "#", size: 3, map: "s_" }))
+sprite("tile_a", "rr\\nrr")
+sprite("tile_b", "gg\\ngg")
+scene("map_fn", { w: 4, h: 2 }, tilemap("xx", { size: 2, map: (_ch, col) => col === 0 ? "tile_a" : "tile_b" }))
+sprite("mask_ok", { w: 1, h: 1 }, (c) => { if (masks.has(1) && masks.has(15)) c.px(0, 0, "w") })`, "t.px.js");
+  assert.equal(keys(pTiles, "mask_ok"), "w", "corners() receives 5th argument mask");
+  const msRows = keys(pTiles, "map_sides").split("\n");
+  assert.equal(msRows[0], "wwwwwwwww", "open north edge across all 3 tiles");
+  assert.equal(msRows[1], "wgggggggw", "open west on left tile, open east on right tile, closed between");
+  assert.equal(keys(pTiles, "map_fn"), "rrgg\nrrgg", "functional tilemap map callback receives (ch, col, row)");
+
+  // 3. c.clip(region, (c) => ...), grid(..., { flip }), sprite/anim { bg }, c.data(name, frame?), spatial density fn
+  const pErg = loadSource(PAL + `
+ramps("krgw")
+sprite("bg_s", { w: 3, h: 2, bg: "k" }, px(1, 0, "w"))
+anim("meta_a", { w: 2, h: 2, frames: 2, fps: 4, bg: "r" }, (c, fi) => { c.setData({ step: fi + 10 }) })
+sprite("read_d", { w: 3, h: 2 }, (c) => {
+  const d0 = c.data("meta_a"), d1 = c.data("meta_a", 1)
+  if (d0?.step === 10 && d1?.step === 11) c.px(0, 0, "g")
+  c.clip([1, 0, 2, 2], (cc) => cc.rect(0, 0, 3, 2, "r"))
+})
+sprite("gflip", { w: 3, h: 2 }, grid(0, 0, "rg.\\n..w", { flip: "xy" }))
+sprite("sdens", { w: 4, h: 1 }, rect(0, 0, 4, 1, "r"), light(undefined, 1, (x) => (x < 2 ? 0 : 1)), recolor({ g: "w" }, undefined, (x) => (x === 3 ? 1 : 0)))`, "t.px.js");
+  assert.equal(keys(pErg, "bg_s"), "kwk\nkkk", "sprite { bg } fills background");
+  assert.equal(keys(pErg, "meta_a"), "rr\nrr", "anim { bg } fills background");
+  assert.equal(keys(pErg, "read_d"), "grr\n.rr", "c.data() reads frame metadata and c.clip() passes c");
+  assert.equal(keys(pErg, "gflip"), "w..\n.gr", "grid() supports { flip: 'xy' }");
+  assert.equal(keys(pErg, "sdens"), "rrgw", "spatial density function (x, y) => k works in light()/shade()/recolor()");
+
+  // 4. own() with no arg and own.prefix
+  const dir = mkdtempSync(join(tmpdir(), "pxl-own-"));
+  try {
+    writeFileSync(join(dir, "k.px.js"), `pal({ r: "#cc3333" })\nconst KIT_PRE = own()\nconst KIT_PRE2 = own.prefix\nsprite("a", "r")`);
+    const mainF = join(dir, "m.px.js");
+    writeFileSync(mainF, `pal({ g: "#33aa33", r: "#cc3333" })\ninclude("./k.px.js", { as: "kit" })\nconst TOP_PRE = own()\nsprite("ok", { w: 1, h: 1 }, (c) => { if (KIT_PRE === "kit." && KIT_PRE2 === "kit." && TOP_PRE === "" && own.prefix === "") c.px(0, 0, "g") })`);
+    assert.equal(keys(loadProject(mainF), "ok"), "g");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

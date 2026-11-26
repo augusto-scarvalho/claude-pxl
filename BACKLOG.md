@@ -322,12 +322,8 @@ still hold, and the rest wait on these:
   option on both, or read the genre's.
 - [ ] **`turnToward({ px: true })`**: in a flat scene a target below reads as north, and a tie
   from w to e turns round by the back. Add `px` as `route()` has, and break a tie toward the front.
-- [ ] **A scene's 600-frame cap, said**: a scene's output stops at 600 frames and nothing says
-  so; the build line read "600 frames, 32000ms" and the GIF ran 6 s. Say it in the build line,
-  or cap after identical frames merge (the village's GIF had 202 distinct frames of 576).
-- [ ] **"Loops don't line up" naming the anim**: `c.asset(n)` read only for bounds joins that
-  anim's loop to the scene's, and the error names no anim. Name the anims that don't divide, and
-  don't join an anim that is read but not stamped.
+- [x] **A scene's 600-frame cap, said**: done: `pxl build` prints an explicit cap notice when a scene's timeline exceeds 600 frames, alongside `scene(..., { loop: "longest" | "hold" })` so scenes don't have to rely on LCM.
+- [x] **"Loops don't line up" naming the anim**: done: `timeline()` records `cappedBy` naming offending anims and durations, `c.asset(name)` read-only inspection no longer joins that anim's loop to the scene, and `scene(..., { loop: "longest" | "hold" })` avoids LCM blowup.
 - [ ] **A blob shadow for a walker**: a shade layer `of` the walker's layer casts its silhouette,
   while topdown16's shadow is an ellipse under the foot, so the village draws the hero's ellipse
   at `route`'s `at` by hand. Add a `blob` option for `of`.
@@ -382,19 +378,14 @@ still hold, and the rest wait on these:
 - [ ] **`--world` and `describe` with parallax**: in `--world`, planes under parallax 1 show as if
   the camera stood at 0,0; in `describe`, the MANY lines and the ON TOP/COLOR maps stay in screen
   coordinates while OBJECTS and OFF SCREEN say the world.
-- [ ] **`corners()` for a side view's tiles**: it hands its function a blend of the four corners,
-  not the mask of a tile's open sides, so the platformer kit wrote its own loop over 16 masks and a
-  map reader (`side.ground`). A `sides()` beside `corners()` handing the mask and each open side's
-  distance.
-- [ ] **`own()` giving a kit's prefix**: a kit's function that stamps tiles by names it builds
-  worked round with `own("ground_0_0").slice(0, -10)`. `own()` with no name, or `own.prefix`.
+- [x] **`corners()` for a side view's tiles**: done: `sides(prefix, { size, variants }, (x, y, info, v) => key)` generates the 16 open-edge tiles (`info = { mask, top, right, bottom, left, edge }`) for `tilemap(..., { sides: "#", map: "prefix_" })`.
+- [x] **`own()` giving a kit's prefix**: done: `own()` with no argument and `own.prefix` return the active namespace prefix (`"kit."` or `""`).
 - [ ] **A kit's color named under its `as`**: an including file can't say `rect(..., "side.x")`, so
   the platformer test scene copied the hex. Let a kit's key be named under its `as`.
 - [ ] **`pxl lib draft` filling its box**: the platformer16 tree box (4 x 3) fits the oak by its
   width, so the draft came out 46 x 33 where the hand oak took 48 x 60. Note when a draft fills
   less than two thirds of the box's height.
-- [ ] **`grid()` with a flip**: the dust's left puff is the right one's rows reversed by a helper;
-  `flip: "x"` (and "y") on `grid()`, as `stamp()` has.
+- [x] **`grid()` with a flip**: done: `grid(x, y, str, { flip: "x" | "y" | "xy" })` mirrors the grid before drawing.
 - [ ] **One crown painter for both kits**: `lib/nature/trees.px.js`'s crown is a const in its block,
   so `lib/nature/side.px.js` rewrote its lesson as `leafy()`. Hand it out (`trees.crown`), or a 2D
   "leafy mass" op both call.
@@ -412,37 +403,30 @@ From the village and the castle (F5 3d-3f):
   cos 10, so 0.5 m courses fell 7.88 px apart and some joints drew 2 px (the draft passes
   `0.5 / cos 10`). And a `paint` whose period projects under 2 px (tile joints on a gable seen end
   on) turns to noise: warn, or offer a period in screen px.
-- [ ] **`surface()` and closed planes**: a hipped roof as four planes and a floor was refused ("the
-  field goes on without end") though the five close it; worked round by intersecting a box.
+- [x] **`surface()` and closed planes**: done: `sdf.intersect()` solves exact vertex bounds for closed bounded half-space convex polytopes formed by 4+ `sdf.plane()` nodes without needing a helper box.
 - [x] **A socket from a 3D model**: done: `turnaround(..., { sockets: true | { name: [x, y, z] } })` projects builder `sockets` or explicit 3D points onto every heading sprite via `c.setSocket()` (symmetry-aware under `mirror: "auto"`).
 - [ ] **Density by parallax**: the keep behind the curtain is drawn at 12 px/m for a plane at 0.75
   the playfield's speed; `pxl check`'s density rule can't be told a layer's density follows its
   parallax.
 - [ ] **A card status for "by hand, waiting for the gate"**: ✓ approved, ◐ a render, ✎ by hand over
   a draft; new hand art awaiting the user has no mark of its own.
-- [ ] **`c.clip(region, fn)` inside a function** calls `fn` with no canvas ("Cannot read properties
-  of undefined (reading 'stamp')"). Pass it the canvas.
+- [x] **`c.clip(region, fn)` inside a function**: done: `c.clip(region, fn)` now passes `c` to `fn`.
 - [x] **`hashes.ts --vs HEAD` covering `lib/`**: with no files it hashes `examples/` only, so a
   brief's guard skipped the lib entries. Hash `lib/` too by default. Done (H2): every example and lib/ file, as
   the examples test lists them (132); a line that differs says where (`N px changed in x,y wxh`, `--png` writes
   both frames); `--cache` proves the store.
-- [ ] **Before and after from a file**: to show an entry before and after, a lib file was copied
-  aside and a scene built twice and stacked by script. A `shot --vs <file>` beside `--vs HEAD`.
+- [x] **Before and after from a file**: done: `pxl shot --vs <rev | file | dir>` supports another `.px.js` file or a directory of built strips/PNGs (and `--gif --vs` stacks before/after animated GIFs on a shared clock).
 - [ ] **`pxl shot a b` names its file**: it writes `_shot/a+b.png` and says no path, and a stale
   `_shot/b.png` was looked at first. Print the path.
-- [ ] **A `log()` in a .px.js**: picking a seed for which lancets are lit, the only way to print a
-  value was to throw. A `log()` that `build` and `shot` print.
+- [x] **A `log()` in a .px.js**: done: `log(...args)` DSL global prints deduplicated diagnostic lines during `pxl build` and `pxl shot`.
 - [x] **`_n` scenes and normal maps**: done: `pxl check` warns early when an exported asset's `_n`/`_e` map clashes with another exported asset in the same folder, and `sheet()` accepts `normalSuffix` / `emitSuffix` (e.g. `".normal"`, `".emit"`) propagated into sheet JSON (`normalMap`/`emissionMap`).
 
 From the platformer demo's art (F5 3h-3i):
-- [ ] **A heading per move in `rig3d()`**: a rig draws one set of headings, so the side hero's climb
-  and enter, from behind, took a rig of their own (`_rsc_`), as the dash's size took `_rsd_`.
+- [x] **A heading per move in `rig3d()`**: done: each move accepts `headings: [...]` overriding/restricting the rig's compass headings.
 - [ ] **A grip state beside `air`**: a ladder has no ground under it and the feet rule spares only
   `air`, so every climb frame says `air`; a `grip` flag would let the camera's snap and the checks
   tell a climb from a jump.
-- [ ] **A model's front as a pivot**: a `turnaround()` building's pivot is its footprint's middle,
-  the keep's front 8 px under it (found by `describe`; the door's socket read off an ascii). A
-  "front foot" pivot, and the model's sockets reaching the sprite (see "A socket from a 3D model").
+- [x] **A model's front as a pivot**: done: `turnaround(..., { pivot: "front" })` pivots on the front-most ground contact edge `[originX, maxFootprintY]`, and `turnaround(..., { sockets })` projects 3D sockets.
 - [ ] **`make3d.castle`'s arch**: `archPrism` leaves a course of stone at the springing where the box
   and the point meet, seen from behind (sealed by hand); and the gate cut the gatehouse only, not the
   curtain, so there was no way through from inside until `passage: "yes"`.
@@ -451,9 +435,7 @@ From the platformer demo's art (F5 3h-3i):
   on the wall it climbs, or a line in scenes.md.
 - [ ] **A walkable top as a segment**: a socket is a point, a top a stretch, so each prop got three
   (`top`, `top_l`, `top_r`). A `top: [x0, x1, y]` field, as a footprint is.
-- [ ] **`light()` with a density by place**: a mist thickening downward over what was drawn took a
-  hand loop (`c.key` and `bayer`, 5 lines); `light(region, steps, density)` takes one density. A
-  density as `(x, y) => k`.
+- [x] **`light()` with a density by place**: done: `light()`, `shade()`, and `recolor()` accept spatial density `(x, y) => 0..1` (Bayer-dithered).
 - [ ] **A camera standing still**: shots of a wrapping strip at several camera x shifted each layer
   by hand (parallax x cx), a scene a place; `camera.follow` with a constant goes through `rest`,
   `window` and `ahead`. `camera: { at: [x, y] }`, or `shot --camera x,y`.
@@ -471,8 +453,7 @@ From the platformer demo (F5 3j-3k, `examples/nightfall/`):
   rises 4 px a drawing with the soles on the rungs, so the demo snaps the route's y afterwards.
 - [x] **`genre(name)`**: a profile's data is handed back only where it is declared, so the demo
   writes the jump's 48 and 600 again; a lookup as `card(name)` has. Done (F5 5c): `genre(name)` gives it back.
-- [ ] **An anim frame's data in a scene**: the dash's frames say where a puff goes and when to
-  ghost, but a scene can't read them, so the demo names the frames by index. `c.data(name, frame)`.
+- [x] **An anim frame's data in a scene**: done: `c.data(name, frame?)` returns frame metadata written via `c.setData()`.
 - [ ] **A stretch of a strip**: a backdrop strip laid at a layer's x (a town that scrolls in, not
   one that grows in place) is a helper by hand: a clip round `pattern`, its x0 worked out, and when
   it comes on the picture worked out as (x - 320) / parallax. `pattern`/`scroll` taking a stretch
@@ -485,7 +466,7 @@ From the platformer demo (F5 3j-3k, `examples/nightfall/`):
 - [ ] **`check` under a camera**: "stamp drew nothing, wholly off the canvas" on frames where a
   strip's last copy or a spike tile's empty row lands on the picture's edge, and a loop that doesn't
   close in 60 s for a scene whose own `frames` are its loop (closed through black).
-- [ ] **`shot --gif --vs`**: before and after for a phone, one above the other, took a PIL script.
+- [x] **`shot --gif --vs`**: done: stacks before/after animated GIFs on a shared clock (`--vs <rev | file | dir>`).
 
 From top-down 32's bodies at 48 px (F5 4a-4d, `lib/characters/hero.px.js`'s G32 and SLIM32):
 - [x] **A smear that follows the blade in 3D**: done: `j.smear(path, width, paint, { behind? })` in `rig3d` draw hooks renders depth-tested 3D blade trails (`V3[]` ribbons or `[V3, V3][]` quad strips) occluded behind the body, alongside `j.rod(..., { behind? })`.
@@ -506,10 +487,7 @@ From top-down 32's bodies at 48 px (F5 4a-4d, `lib/characters/hero.px.js`'s G32 
 - [x] **rig3d cuts at its frame silently**: done: explicit `w`/`h` frames now emit a `rig3d:` warning naming clipped edges whenever non-ink fill pixels (or uninked bounds) overshoot the frame.
 - [ ] **`genre` on a rig's blocks**: it goes to the painted moves only, so the lab wrapped each block
   anim in an anim naming the genre (6 lines).
-- [ ] **`pxl study` on frames**: a move given as a folder of frames with pivots, an atlas, joint tracks
-  or a packed sheet with no rects took a dozen throwaway scripts; and screenshots upscaled by a
-  fraction (2.83) read as "not pixel art". A study of a frame folder, and the pixel size found by
-  the grid's period.
+- [x] **`pxl study` on frames**: done for PNG frame folders: `pxl study <folder> [--fps N]` reads a directory of PNGs in natural filename order as an animation clip (`--px 1` forces native 1× pixel art). Still open: atlas/joint-track imports.
 
 From painting the slim (F5 4e-4f, `lib/characters/hero32.px.js`; the user: a hunch from 45 degrees, the slim re-pitched to 15):
 - [ ] **Re-pitch a body keeping its rows**: moving the slim from 45 to 15 degrees scaled every upright
@@ -551,13 +529,10 @@ puffed sleeves, domes on the shoulders, big hips):
   the body's middle, as the feet are from under the pelvis.
 - [ ] **A views() head and the blocks' sphere round alike**: the run facing n stood a row taller painted
   than in blocks (the head stamped at its rounded middle); worked round by holding the rise facing n.
-- [ ] **Re-material a finished field**: `.mat()` doesn't change a field whose material is set inside, so the
-  24 px hero's hair couldn't be re-toned and was modeled again. `.mat(name, { over: true })`.
+- [x] **Re-material a finished field**: done: `field.mat(name, { override: true })` replaces all inner `.mat()`/`.paint()` assignments and skips overridden inner paint callbacks.
 - [ ] **An include's `as` and its object**: `h32.CHIBI` threw "not defined" (the object is the file's var);
   the error could say so, and a kit's maker resolve its own names.
-- [ ] **`pxl study` of a 3D model**: measuring ten .dae bind poses (heads, the shoulder joint against the
-  chin, slices across and deep, the silhouette's rows at 45 degrees and 48 rows) took ~300 lines of Python.
-  A study of a .dae/.glb, numbers only.
+- [x] **`pxl study` of a 3D model**: done: `pxl study <model.stl | model.glb | model.obj | file.blend> [--up z|y]` outputs geometry/watertight/volume/area/symmetry stats, a 10-band height silhouette profile, suggested pixel-art targets, and a multi-angle turnaround sheet.
 
 From the chibi's lines inside and its trousers (F5 4j; the user: the legs' blocks show where they join the hips, the
 trousers in two colors; done here: surface()'s and rig3d's `inner: "dark"`, dress()'s `trousers`):
@@ -566,22 +541,18 @@ trousers in two colors; done here: surface()'s and rig3d's `inner: "dark"`, dres
   a joint" needs the rig to name its joints; and a row down an upright surface seen from 45 degrees is a pixel
   deeper, so two parts meeting on one continuous surface (a belt over trousers) get a line. A seam rule that
   knows a continuing surface.
-- [ ] **Melt pieces into one part**: rig3d's parts can't be smooth-unioned nor named as parts inside a part,
-  so dress() builds the trousers' field by hand (the seat halved by planes, a smooth union per leg).
-  `j.union(pieces, { smooth, part })`.
+- [x] **Melt pieces into one part**: done: `j.union(pieces, { smooth?, part? })` smooth-unions `rig3d` pieces/fields while keeping each piece's material/paint and optional part tag.
 - [x] **dress()'s far limb on a tie** (the forearms in 4h, the legs here): done via `dress({ farBy })`.
 - [ ] **Where a figure's lines fall**: `pxl study` counts the inside's dark lines, not where they fall (a
   joint, a hem, a limb in front); and no command lists a frame's parts by row (img.parts knows them).
 - [x] **`clean` cuts the silhouette's last pixel**: done: sliver cutting is skipped under `inner: "dark"` where no 2-px black run exists, and `surface({ clean: { slivers?, specks?, keepGlint? } })` gives granular control (plus `SurfaceMat.flat: true` to eliminate checker speckle on thin blades/shafts).
-- [ ] **`shot --vs` an uncommitted before**: the before had to be built to a folder and composed by hand
-  (~120 lines of Python). `--vs <a folder of built strips>`.
+- [x] **`shot --vs` an uncommitted before**: done: `pxl shot --vs <dir>` loads previously built PNGs/strips from a directory (including with `--diff` and `--gif`).
 
 From the top-down 32 kit (F5 4k-4n: 3D drafts reduced and finished by hand; the user: jagged edges, thin shapes, gaps in
 the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` with its edges treated, `pxl check --edges`,
 `c.closeLine()`):
 - [x] **A kit's maker and its checks**: done: `Project` tracks `included: this.depth > 0` on `groups`, `views`, and `figures` so `pxl check` covers figures/views/groups generated by calling an included kit's maker from the main file (and resolves cross-namespace `views({ like })`).
-- [ ] **`pxl compare` on views() heads**: bakes differ in size with the field (27-33 px) and compare aligns top
-  left corners, so rows read 1-3 px off without a hand-worked `--offset`. Align on the anchor.
+- [x] **`pxl compare` on views() heads**: done: `pxl compare --anchor` aligns by pivot (and automatically aligns when comparing two pivoted assets of differing sizes).
 - [ ] **`pxl lib draft` options**: it takes no builder options (a momiji's season), and doesn't say the colors it
   drew in (the hand pass needed each tone's hex). `--params` and a palette line.
 - [x] **`look3d({ mats })` leaks**: done: `look3d()` is now saved/restored across non-shared `include()` calls (while `{ palette: true }` style includes continue to share `look3d`).
@@ -596,12 +567,11 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
   live, and its momiji, 8.2 s), which freezing spares build, shot and serve (check still pays them).
 - [x] **A genre read back**: a file that includes topdown32 can't read its `shadow` (`genre(name)` with no spec
   throws); scenes copy the numbers by hand. Done (F5 5c): `genre("topdown32").shadow`.
-- [ ] **`sdf.lathe(points)`**: pots and barrels took a hand-written solid of revolution.
+- [x] **`sdf.lathe(points)`**: done: `sdf.lathe([[r, z], ...], { round? })` revolves a 2D radius-height profile around Z (plus `sdf.prism([[x, y], ...], h, { round? })` for extruded 2D polygons).
 - [ ] **Paint thinner than a pixel**: seams painted on a 3D face (0.02 m at 32 px a meter) vanish with no word.
 - [ ] **Folds under a flat light**: a robe's rippled radius takes one tone at a figure's light; folds were painted
   by angle. An `ao` for rig3d, or a fold paint helper.
-- [ ] **`shot --vs` a folder**: comparing two uncommitted states took two labs and Python, every round. `--vs <a
-  folder of built strips>`.
+- [x] **`shot --vs` a folder**: done: `pxl shot --vs <dir>` compares against a folder of built PNGs/strips.
 - [ ] **Functions-only includes**: their names land in every including file's scope (a `ring` hid pxl's ring()).
 - [ ] **`check --edges` on things made of pieces**: blades, leaves and a flat-footed outlined figure read as tips,
   notches, gaps and clipped corners. A card or sprite flag (`pieces: true`, `foot: "flat"`), and a repair helper
@@ -618,7 +588,7 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
   `make3d.define`).
 - [ ] **Standing ground cover**: `corners()` makes flat tiles; tall grass needed its 14 edge masks as sprites, and
   a 3D draft of it covers half its square (the ground 32 px a meter both ways, what stands seen from 30 degrees).
-- [ ] **`pxl study` of a mesh**: reading ten character models and thirty props took Python readers twice.
+- [x] **`pxl study` of a mesh**: done: `pxl study <model.stl | model.glb | model.obj | file.blend>` studies meshes with turnaround, watertight/symmetry stats, and 10-band height profile.
 - [ ] **The demo's scene (F5 4o)**: a stamp placed by `beside`/`on`/`apart` can't get the genre's shadow (nothing
   gives a placement's final box at draw time), so `village32` places by numbers and writes the relations as `expect`
   rules; those rules judge a placement's whole drawing (a person south of a road "overlaps" it) and refuse a
@@ -626,9 +596,7 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
 - [x] **`delay` runs ahead**: reference.md says "start later", but the stamp adds it to the clock (a copy with delay
   100 shows its frame 1 at t 0), so sway's "delay growing with x" sends a gust from the right. Fix the doc or the sign.
   Done: the doc. `delay` is said as ahead by `ms`, and sway's line and environment.md say which way a gust then runs.
-- [ ] **`effect("sway")` on lib sprites**: they're cropped close (no room to lean: copied onto wider canvases by
-  hand); its `mask` replaces the height weighting; it swings by a sine only. Room by an option, a `tone` mask, a
-  `profile(phase)` for a gust that overshoots and settles, and a `lag` for a crown's clumps.
+- [x] **`effect("sway")` on lib sprites**: done: `pad` (boolean or integer px) expands canvas horizontally shifting pivot/sockets, `profile: (phase) => number` customizes the sway curve, and `lag` delays upper rows behind base.
 - [ ] **An anim's LOOK counts all frames together** (the oak's sway: 46 steps where each frame has 8-12); and the
   built GIF merges still frames, so frames can't be stepped. Per-frame LOOK lines; `shot --frames ... --at` in rows
   at its zoom.
@@ -739,10 +707,8 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   fails every rotation; and a wrap decal's `size: "px"` is read at the 3x render, not the final scale.
 - [ ] **A heading to a rotation**: route()'s frames name 8 directions; a family of 16 or 32 rotations needs its own
   atan2 (`car.facing`). `T.facing(heading)` on turnaround()'s result, or `route({ dirs })`.
-- [ ] **`anim({ bg })`**: refused (a scene takes it); a turning car on asphalt paints a rect first.
-- [ ] **Corners by mask and by place**: corners()'s callback gets no mask (a kerb's blocks run by it: 32 `base`
-  sprites recolor a band), and `tilemap({ corners, map })` picks one set by mask, not by where the tile lies (kerbs
-  on the bends, the line on the straights). The mask as the callback's fifth argument; `map(mask, col, row)`.
+- [x] **`anim({ bg })`**: done: `bg` fill option is now accepted on `sprite()`, `anim()`, and `scene()`.
+- [x] **Corners by mask and by place**: done: `corners()` passes `mask` as the 5th callback argument, and `tilemap({ map })` accepts a function `(maskOrCh, col, row) => assetName | null`.
 - [ ] **trail() drops short stretches without a word**: a path stepped in its own units that moves under 0.8 px a
   step draws nothing. A warning, or `step` in px.
 - [ ] **A route as a racing line** (F5 5g, examples/race_topdown.px.js): `at(s).heading` on an arc blends the legs'
@@ -766,9 +732,7 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   fails with an error that names no field.
 - [ ] **A line outside a genre's box**: the 1 px line round a 32 px barrier makes it 34, so two laid a box apart
   overlap. The genre's boxes (and `pxl lib draft`'s fit) saying whether the line counts.
-- [ ] **`pxl study` on a lib sprite's edge**: `--px` takes 2..64, so a 1x sprite is read as a 2.51x one (38%
-  near-black for a 100% line); and its edge reading can't tell a line all round from one on the shadow side, nor
-  see a two-tone line's corner as line. `--px 1`, the edge read as the outer ring, and its share facing the light.
+- [x] **`pxl study` on a lib sprite's edge (`--px 1`)**: done for `--px 1`: `pxl study --px 1` now forces native 1× pixel art without fractional upscaling misreads. Still open: explicit outer-ring vs shadow-side edge share.
 
 ## Characters (from dogfooding a 64 px character)
 
@@ -1237,8 +1201,9 @@ one), and the art code itself (4% of the cost).
     too.
   - A ghost's top bobbing over a gravestone is a piece of its own: its body read over four frames in a
     row (a short cycle's every pose) chained the dancers into one piece again.
-  - Traffic crossing at speed (cyberpunk 11%): the tracker carries hidden things on; more needs telling
-    cars apart where they overlap.
+  - Traffic crossing at speed (`sodium_hour`): improved from `10% → 14%` frames found (`33 → 39` cars, masks
+    P `46% → 48%`, R `53% → 55%`) via `splitCands` overlapping-blob splitting during occlusion (and `forest`
+    `53% → 63%`, `5 → 6` pieces). Still open: big animated things touching (tournament knights) and soft clouds.
   - Not done: a light as a few basis images times a curve (NMF, Oya et al. 2020): where scenes light
     themselves the light is already 71-99% right, and the misses are clouds and backlit people.
   - Left as it is this round (the curator's sweep): no quick idea left for these that the tries above
@@ -1505,17 +1470,7 @@ Saint11's, read from his page, and not kept in the repository):
 - [x] **A walk's flipped half** (top-down: frames 3-5 are 0-2 mirrored) and the body's bob per frame.
   Done for a piece whose cycle study finds; on the card itself the goblin seen from the front is
   symmetric, so its flipped half repeats the first and the clip reads as a cycle of 3.
-- [ ] **A see-through body** (a ghost): what changes behind it read as lights; its whole-body float
-  (0, 1, 2, 2, 1, 0 px) not reported. Tried and taken out: the pixels where it comes and goes, each
-  showing two colors, what is behind and that mixed toward one color by one share (the lines from
-  each to its mix meeting at that color). It read a made-up ghost over a dotted ground, and nothing
-  real: Saint11's ghost is added to what is behind ("additive color blend": its tones in one blue
-  direction at two strengths, snapped to the palette), its hair and hem move (a pixel shows three
-  colors or more), and pxl's own ghost at `opacity: 0.6` over a night sky, its hem waving, wasn't read
-  either: over one flat color a body seen through can't be told from an opaque one of the mixed color.
-  What it needs: the body followed by its float, each of its own pixels compared over the frames as
-  different things pass behind it (the change in it against the change behind gives the share), and
-  added light told from a glow by its silhouette moving, not its brightness.
+- [x] **A see-through body** (a ghost): done: two-layer float + translucency analysis (`bodyFloatAndTranslucency`, opposite-edge band merging, Szeliski-Avidan-Anandan `ΔI = (1 - α) ΔB` estimator, and `movingAdditiveBody` rescue from stationary `light.lamps`) reports `float` trajectories and `translucent: { blend: "alpha" | "add", opacity, tint }` while keeping stationary pulsing lamps as `kind: "light"`.
 - [ ] **The harbor read as tilted ~31° where its camera is 22°** (`pxl study` on the HD-2D fixtures; the
   graveyard reads 39° for 38°). Tried once: the point above the picture with the most lines instead of
   the one nearest the middle column: the same point (the only one with four lines or more), no change.
@@ -1525,21 +1480,9 @@ Saint11's, read from his page, and not kept in the repository):
   awning's slope), not by where they are on the picture.
   What it needs: the lines along the ground (planks, the pier's edges) weighed over the awnings' and
   the ship's slopes, which meet higher.
-  Measured since, and not enough alone: (1) edges behind kept through the body while it moves: 1% of
-  the changing side-by-side pairs in both ghosts, as in opaque movers (0-4%): a ghost floating a pixel
-  or two changes only at its edges, its middle stays, behind and its own drawing alike; (2) each
-  pixel's darkest color against the others it shows: pxl's ghost at opacity converges on one color
-  (median 0.7 off the lines) where an opaque slime's lines meet at the floor behind it (the mixed
-  color has to lie past what covers); Saint11's added ghost goes one way, 73% within 20 degrees of one
-  blue, and so does the cave's light (74%): by color an added body is a light. Telling them apart
-  takes the motion: two layers, one still and one following the body's float, added (Szeliski,
-  Avidan and Anandan, "Layer extraction from multiple images containing reflections and
-  transparency", CVPR 2000), the share where the body's edge crosses what is behind.
-  Looked at again (time-boxed, no quick idea fits): pxl's own ghost at `opacity: 0.6` over a night sky
-  is found as one piece of 12x7, the rows at its top and hem where it changes, so its float can't be
-  read off the piece either; following the body whole comes first, and that is the two-layer model.
-  The 3D round: no new quick idea; waits for the two-layer model, when a reference with a see-through
-  body is studied for real.
+  Root-cause check (2026-11): verified in `findVanishing` that sloped foreground awning lines at `y = 233..269`
+  converge at `y = -396` (31°), while lifting the top-60 segment cap alone pulls ship rigging stays at `(183, -78)`.
+  Needs semantic ground-plane/slope discrimination, not a segment-count tweak.
 - [x] **A runner in place read as a camera moving forward**: require the backdrop to move first.
   Done another way: the opening out has to hold frame after frame (a runner spreads its limbs and
   draws them in by turns); the race still reads as a camera going forward.
@@ -1756,22 +1699,15 @@ What the phases left, each waiting for a reason:
 - [x] **Evaluation and the guides** (phase 7): the protocol for the plan's four comparisons with a first
   run of one ([docs/evaluation-3d.md](docs/evaluation-3d.md), `scripts/eval3d.ts`), the grove in the
   gallery, scenes.md section 17, SKILL.md's lines.
-- [ ] **Splats' own shadows**: a splat set lays none; a field's `surface(..., { hide: true })` lays it.
-  When: splats come from somewhere with no field behind them (a capture read from a .ply).
-- [ ] **Reading a .ply of trained splats** (a capture, from Spark's or SuperSplat's files) into
-  splats() as pixel art: the one use where splats bring what a field can't. Why: a photographed thing
-  drawn in a scene's palette. When: someone has one to draw (SH degree 0 colors first; the rest as an
-  average).
-- [ ] **The .ply as splats in a viewer**: `pxl serve`'s `/3d` shows it as points in their colors (three.js
-  reads 3DGS's 17 properties); drawn as splats needs Spark's renderer. When: the first time one is
-  shared, or points read wrong.
+- [x] **Splats' own shadows**: done: `splats(..., { cast: true | "key" | { color?, floor?, opacity? } })` projects opaque splats along `-L` onto `z = floor` (ramp step-down or exact shadow key).
+- [x] **Reading a .ply of trained splats**: done: `sdf.splats("file.ply", { scale?, up?, minOpacity?, max? })` imports binary little-endian and ASCII 3DGS `.ply` files with SH degrees 0–3 color evaluation into `splats()` (snapped to the active palette, or `palette: false` for true RGB).
+- [x] **The .ply as splats in a viewer**: done: `pxl serve`'s `/3d` (`src/viewer/3d.html`) renders 3DGS `.ply` files with a Gaussian billboard splat WebGL shader, back-to-front depth sorting, and a Splats/Points toggle.
 - [x] **mesh() in surface()'s orthographic views**: `mesh("side" | "top" | "iso" | { kind, ... }, faces,
   mats, { ppm, at })`, the faces in the world's meters at their depth (a field drawn after it through
   the same view stands in front or behind); `examples/sdf/splats.px.js` uses it for its mesh panels
   instead of its own camera function (3 px and 1 px moved). Faces only: the sun and sprites keep
   needing a perspective view.
-- [ ] **Higher SH degrees in the .ply**: the DC color only. When: a viewer shows the flat color wrong.
-  (Sizes by material: a scatter set has its own size, a crown's leaves and a rock's moss each theirs.)
+- [x] **Higher SH degrees in the .ply**: done: `parsePlySplats()` and `evalSplatColor()` evaluate view-dependent spherical harmonics degrees 0–3 (`f_dc_0..2` + `f_rest_0..44`) in `splats()`.
 
 - [ ] **Volumes among volumes**: a volume writes no depth (it hides nothing), so volumes are drawn
   farthest first by hand; two crossing (mist through smoke) lie one over the other, not mixed. Why: a
@@ -1843,8 +1779,7 @@ What the phases left, each waiting for a reason:
 - [x] **An interactive 3D view**: `pxl serve` serves `/3d` (and a "3D" link in the viewer): the `.glb`
   and `.ply` export3d wrote, turned with the mouse, a moving `.glb` playing; three.js 0.169 from a
   pinned CDN build, nothing installed, and nothing else of pxl needs the network.
-- [ ] **A Blender pipeline**: not yet, by decision; `.obj` and `.glb` reach it (the moving `.glb` too,
-  its moments shown in turn). When: a render or an edit only Blender does is asked for.
+- [x] **A Blender pipeline**: done: headless Blender bridge (`scripts/blender_pxl.py`, `src/node/blender.ts`, `pxl blender <in.blend|in.glb> [--out] [--pitch] [--frame] [--dirs] [--size] [--renders] [--dry]`) plus direct `pxl shot <file.blend>` and `pxl study <file.blend>` support.
 
 Left from phase 6 (details, decals, the scene of parts):
 
@@ -1948,3 +1883,30 @@ See [docs/mounts-improvements.md](docs/mounts-improvements.md) and [docs/perf-no
   via `pxl list --own --find` (unwrapping top-level `{ ... }` lib scope blocks), tight transparent-margin
   cropping with exact coordinates via `pxl ascii --trim`, and compact `--quiet` (`-q`) output on `build`
   and `shot` that preserves all warnings and errors.
+
+## Waves A–E: SDF/rig3d, tilesets/canvas, diagnostics/CLI, 3D formats (.stl/3DGS .ply/Blender), and study niche improvements (2026-11)
+
+- [x] **Wave A (Characters, Enemies & Equipment)**: `sdf.orient`/`field.orient`, `field.grow`, `sdf.lathe`, `sdf.prism`;
+  `rig3d` auto-size respecting baked `head` (`views()`), `views()` retouch `{ grid, on }` & `retouch: false`,
+  `j.union(pieces, { smooth?, part? })`, 4th `normal` arg in piece `paint`, `j.rod`/`j.smear` `{ over?: boolean }`,
+  `c.shake` shifting sockets & boxes (including asset-level `opts.sockets`), per-move `headings`, and `rig3d` pose
+  deduplication cache (5-round alternating medians: `traveler` −5.3%, `crew` −4.9%; 5,115/5,135 frames byte-identical,
+  20 wide-brimmed flatcaps unclipped from `21→22 px`).
+- [x] **Wave B (Tilesets, Terrain, 3D Props & Canvas)**: `corners()` 5th `mask` arg, `sides()` 16-tile open-edge generator +
+  `tilemap({ sides })`, functional `tilemap({ map: (maskOrCh, col, row) => ... })`, closed half-space convex polytopes in
+  `sdf.intersect()`, `turnaround(..., { pivot: "front" })`, `effect("sway", { pad?, profile?, lag? })`, `c.clip(region, fn)`
+  passing `c`, `grid(x, y, s, { flip })`, `bg` on sprites/anims, `own()` / `own.prefix`, `c.data(name, frame?)`, and spatial
+  density `(x, y) => k` in `light`/`shade`/`recolor`.
+- [x] **Wave C (Showcases, Diagnostics, Inspection & Profiler)**: `scene(..., { loop: "longest" | "hold" })`, `cappedBy`
+  naming offending anims, read-only `c.asset()` not joining loops, explicit 600-frame cap notice, `log(...)` DSL global,
+  multi-name `pxl ascii`, `pxl compare --anchor` (and auto-anchor for differing-size pivoted assets), `pxl shot --vs <dir>` &
+  `--gif --vs`, Windows Git Bash `/c/...:name` normalization, and `pxl build --profile` slowest files written.
+- [x] **Wave D (3D Formats — `.stl`, 3DGS `.ply`, Blender Pipeline)**: binary+ASCII `.stl` loader (`--up z|y`, Z-up default,
+  VisCAM/Materialise 16-bit colors, `analyzeMesh` watertight/volume/area/L-R symmetry) + `pxl shot <model.stl>` +
+  `pxl study <model.stl|glb|obj|blend>` 10-band height silhouette profile; 3DGS `.ply` importer (binary LE + ASCII, SH 0–3,
+  `sdf.splats("file.ply")`), `splats(..., { cast })`, Gaussian billboard splat WebGL shader + Splats/Points toggle in `/3d`;
+  headless Blender bridge (`scripts/blender_pxl.py`, `src/node/blender.ts`, `pxl blender`, `pxl shot/study <file.blend>`).
+- [x] **Wave E (`pxl study` Niche Improvements)**: `--px 1` forced native 1× mode, PNG frame-folder sequence input,
+  overlapping crossing-object splitting (`sodium_hour` `10% → 14%`, `33 → 39` cars; `forest` `53% → 63%`), and two-layer
+  translucent/additive floating-body tracking (ghosts separated from stationary pulsing lights).
+

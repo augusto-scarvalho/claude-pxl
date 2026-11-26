@@ -1,6 +1,6 @@
 // Writes build results to disk: PNGs, layer PNGs, sheets + JSON, previews.
 import { mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { threadId } from "node:worker_threads";
 import { PxError, didYouMean, wrap } from "../core/errors.ts";
 import type { Img } from "../core/image.ts";
@@ -44,6 +44,8 @@ export interface OutputResult {
   errors: PxError[];
   /** How long each asset took to build and write, in ms. */
   times: [string, number][];
+  /** Timing and size of each file written during this build (for `pxl build --profile`). */
+  fileWrites: { file: string; bytes: number; ms: number }[];
 }
 
 let atomicSeq = 0;
@@ -184,6 +186,18 @@ export function packedSheet(p: Project, s: SheetDef): { items: { name: string; i
 /** Build and write. Each asset fails independently; errors are collected, not thrown. */
 export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}): OutputResult {
   const lines: string[] = [], errors: PxError[] = [], times: [string, number][] = [];
+  const fileWrites: { file: string; bytes: number; ms: number }[] = [];
+  const write = (path: string, data: string | Buffer): void => {
+    const t0 = performance.now();
+    writeAtomic(path, data);
+    fileWrites.push({ file: relative(out, path).replace(/\\/g, "/"), bytes: typeof data === "string" ? Buffer.byteLength(data) : data.byteLength, ms: performance.now() - t0 });
+  };
+  const writePng = (path: string, img: Img): void => {
+    const t0 = performance.now();
+    const buf = encodePng(img);
+    writeAtomic(path, buf);
+    fileWrites.push({ file: relative(out, path).replace(/\\/g, "/"), bytes: buf.byteLength, ms: performance.now() - t0 });
+  };
   const sheetNames = new Set([...p.sheets.map((s) => s.name), ...p.models.map((m) => m.name)]);
   if (opts.only)
     for (const n of opts.only)
@@ -259,6 +273,10 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         write(join(out, dir, n + ".gif"), (own = encodeGif(frames, { onPalette: (pl) => { ownPal = pl; }, onInfo: (i) => { gifUnique = i.unique; } })));
         const play = p.direction(n);
         info = play === "forward" ? ` (${frames.length} frames, ${b.anim!.loop}ms)` : ` (${p.drawn(n).length} frames ${play}, ${b.anim!.loop}ms)`;
+        if (b.anim && !b.anim.durations) {
+          const total = Math.max(1, Math.round(b.anim.loop / b.anim.step));
+          if (total > 600) info += ` -- capped at ${frames.length} of ${total} frames (${Math.round(frames.length * b.anim.step)}ms of ${b.anim.loop}ms)`;
+        }
         if (def.kind === "anim" && frames.length > 1 && gifUnique === 1) info += ` -- static: all ${frames.length} frames identical`;
       }
       if (opts.share) {
@@ -307,7 +325,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         pv = ` @${s}x`;
       }
       if (b.anim?.long) info += ` -- ${b.anim.long}`;
-      if (b.anim?.capped) info += " -- loops don't line up, cut at 60s: give the anims durations on one grid (fps 4, 5, 10 or ms in 100s; fps 6 makes 167ms frames)";
+      if (b.anim?.capped) info += ` -- loops don't line up, cut at 60s${b.anim.cappedBy ? ` (${b.anim.cappedBy})` : ""}: use loop: "longest" / "hold" or put durations on one grid (fps 4, 5, 10 or ms in 100s; fps 6 makes 167ms frames)`;
       lines.push(`${def.kind} ${n} ${b.img.w}x${b.img.h}${info}${pv}`);
     } catch (e) {
       errors.push(wrap(e));
@@ -420,5 +438,5 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       errors.push(wrap(e).within(`export3d '${m.name}'`, m.loc));
     }
   }
-  return { lines, errors, times, left };
+  return { lines, errors, times, left, fileWrites };
 }

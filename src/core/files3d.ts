@@ -8,7 +8,7 @@
 import { type Color, LIN } from "./color.ts";
 import { PxError } from "./errors.ts";
 import type { Mesh3, Voxels } from "./grids.ts";
-import { SPLAT_LIGHT, type Splats, splatLight } from "./splats.ts";
+import { SPLAT_LIGHT, Splats, splatLight } from "./splats.ts";
 
 const rgb = (c: Color): [number, number, number] => [c >>> 24, (c >>> 16) & 255, (c >>> 8) & 255];
 /** MagicaVoxel's model limit, cells a side. */
@@ -219,18 +219,242 @@ export function encodePly(S: Splats, ramps: Color[][]): Uint8Array {
   return out;
 }
 /** What a 3DGS .ply says: its splats, its properties, its box (Y up), the mean opacity and scale. */
-export function readPly(b: Uint8Array): { count: number; props: string[]; min: number[]; max: number[]; opacity: number; scale: number } {
-  const text = new TextDecoder().decode(b.subarray(0, Math.min(b.length, 4096))), end = text.indexOf("end_header\n");
-  if (!text.startsWith("ply\n") || end < 0 || !text.includes("format binary_little_endian 1.0")) throw new PxError("not a binary little-endian .ply");
-  const lines = text.slice(0, end).split("\n"), count = +(/element vertex (\d+)/.exec(text)?.[1] ?? NaN), props = lines.filter((l) => l.startsWith("property float ")).map((l) => l.slice(15));
-  const base = new TextEncoder().encode(text.slice(0, end + 11)).length, stride = props.length * 4, dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
-  if (!(count >= 0) || base + count * stride !== b.length) throw new PxError(`.ply: ${count} vertices of ${props.length} floats don't fill its ${b.length} bytes`);
-  const get = (i: number, p: string) => dv.getFloat32(base + i * stride + props.indexOf(p) * 4, true);
+export function readPly(b: Uint8Array): { count: number; props: string[]; min: number[]; max: number[]; opacity: number; scale: number; shDegree: number } {
+  const head = parsePlyHeader(b);
+  const count = head.count, props = head.props.map((p) => p.name);
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   let op = 0, sc = 0;
+  const ix = head.index.get("x"), iy = head.index.get("y"), iz = head.index.get("z");
+  const io = head.index.get("opacity"), is0 = head.index.get("scale_0");
+  let restCount = 0;
+  for (const p of props) if (/^f_rest_\d+$/.test(p)) restCount++;
+  const shDegree = restCount >= 45 ? 3 : restCount >= 24 ? 2 : restCount >= 9 ? 1 : 0;
   for (let i = 0; i < count; i++) {
-    ["x", "y", "z"].forEach((p, e) => { const v = get(i, p); min[e] = Math.min(min[e], v); max[e] = Math.max(max[e], v); });
-    op += 1 / (1 + Math.exp(-get(i, "opacity"))); sc += Math.exp(get(i, "scale_0"));
+    const x = ix !== undefined ? head.get(i, ix) : 0;
+    const y = iy !== undefined ? head.get(i, iy) : 0;
+    const z = iz !== undefined ? head.get(i, iz) : 0;
+    if (x < min[0]) min[0] = x; if (x > max[0]) max[0] = x;
+    if (y < min[1]) min[1] = y; if (y > max[1]) max[1] = y;
+    if (z < min[2]) min[2] = z; if (z > max[2]) max[2] = z;
+    op += io !== undefined ? 1 / (1 + Math.exp(-head.get(i, io))) : 1;
+    sc += is0 !== undefined ? Math.exp(head.get(i, is0)) : 0;
   }
-  return { count, props, min, max, opacity: count ? op / count : 0, scale: count ? sc / count : 0 };
+  return { count, props, min, max, opacity: count ? op / count : 0, scale: count ? sc / count : 0, shDegree };
+}
+
+interface PlyProp { name: string; type: string; size: number; off: number }
+interface ParsedPly {
+  format: "binary_little_endian" | "ascii";
+  count: number;
+  props: PlyProp[];
+  index: Map<string, number>;
+  get: (i: number, propIdx: number) => number;
+}
+
+const PLY_SIZES: Record<string, number> = {
+  char: 1, int8: 1, uchar: 1, uint8: 1,
+  short: 2, int16: 2, ushort: 2, uint16: 2,
+  int: 4, int32: 4, uint: 4, uint32: 4, float: 4, float32: 4,
+  double: 8, float64: 8,
+};
+
+function parsePlyHeader(b: Uint8Array): ParsedPly {
+  const probeLen = Math.min(b.length, 16384);
+  const text = new TextDecoder().decode(b.subarray(0, probeLen));
+  const mEnd = /\r?\nend_header\r?\n/.exec(text);
+  if (!/^ply\r?\n/.test(text) || !mEnd) throw new PxError("not a .ply file (missing ply / end_header)");
+  const headerStr = text.slice(0, mEnd.index);
+  const bodyStart = new TextEncoder().encode(text.slice(0, mEnd.index + mEnd[0].length)).length;
+  const lines = headerStr.split(/\r?\n/);
+  let format: "binary_little_endian" | "ascii" | undefined;
+  let count = -1, inVertex = false, off = 0;
+  const props: PlyProp[] = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith("comment") || line === "ply") continue;
+    const parts = line.split(/\s+/);
+    if (parts[0] === "format") {
+      if (parts[1] === "binary_little_endian") format = "binary_little_endian";
+      else if (parts[1] === "ascii") format = "ascii";
+      else throw new PxError(`unsupported .ply format '${parts[1]}' (expected binary_little_endian or ascii)`);
+    } else if (parts[0] === "element") {
+      inVertex = parts[1] === "vertex";
+      if (inVertex) count = parseInt(parts[2], 10);
+    } else if (parts[0] === "property" && inVertex) {
+      if (parts[1] === "list") throw new PxError(".ply: list properties on vertex elements are not supported");
+      const type = parts[1], name = parts[2], size = PLY_SIZES[type];
+      if (!size || !name) throw new PxError(`.ply: unsupported vertex property '${line}'`);
+      props.push({ name, type, size, off });
+      off += size;
+    }
+  }
+  if (!format) throw new PxError("not a .ply file (missing format line)");
+  if (!(count >= 0)) throw new PxError(".ply: missing vertex count");
+  const index = new Map(props.map((p, i) => [p.name, i]));
+  if (format === "binary_little_endian") {
+    const stride = off;
+    if (bodyStart + count * stride > b.length)
+      throw new PxError(`.ply: ${count} vertices of ${stride} bytes don't fit in ${b.length - bodyStart} bytes`);
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    const get = (i: number, pi: number): number => {
+      const p = props[pi], at = bodyStart + i * stride + p.off;
+      switch (p.type) {
+        case "float": case "float32": return dv.getFloat32(at, true);
+        case "double": case "float64": return dv.getFloat64(at, true);
+        case "uchar": case "uint8": return dv.getUint8(at);
+        case "char": case "int8": return dv.getInt8(at);
+        case "ushort": case "uint16": return dv.getUint16(at, true);
+        case "short": case "int16": return dv.getInt16(at, true);
+        case "uint": case "uint32": return dv.getUint32(at, true);
+        default: return dv.getInt32(at, true);
+      }
+    };
+    return { format, count, props, index, get };
+  }
+  // ASCII .ply
+  const body = new TextDecoder().decode(b.subarray(bodyStart));
+  const rows: number[][] = [];
+  for (const raw of body.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    rows.push(line.split(/\s+/).map(Number));
+    if (rows.length >= count) break;
+  }
+  if (rows.length < count) throw new PxError(`.ply: expected ${count} ASCII vertex rows, got ${rows.length}`);
+  return { format, count, props, index, get: (i, pi) => rows[i][pi] ?? 0 };
+}
+
+export interface PlyImportOpts {
+  /** Source up axis: "y" (standard 3DGS / glTF, default; converts (x, -z, y)) or "z" (already Z-up). */
+  up?: "y" | "z";
+  /** Uniform scale multiplier applied to positions and splat radii (default 1). */
+  scale?: number;
+  /** Drop splats with sigmoid opacity below this threshold (default 0.01). */
+  opacityMin?: number;
+  /** Maximum number of splats to keep (keeps highest opacity*volume splats first; default 250000). */
+  limit?: number;
+}
+
+/**
+ * Load a 3D Gaussian Splatting `.ply` (binary little-endian or ASCII, SH degree 0..3) into a `Splats`
+ * object in pxl Z-up world coordinates, preserving SH DC + higher-order `f_rest_*` coefficients so
+ * `splats()` can evaluate view-dependent color and snap to the active palette.
+ */
+export function parsePlySplats(b: Uint8Array, opts: PlyImportOpts = {}): Splats {
+  const up = opts.up ?? "y";
+  if (up !== "y" && up !== "z") throw new PxError(`sdf.splats(.ply): up must be "y" or "z", got ${JSON.stringify(opts.up)}`);
+  const scaleMul = opts.scale ?? 1;
+  if (!(Number.isFinite(scaleMul) && scaleMul > 0)) throw new PxError(`sdf.splats(.ply): scale must be > 0, got ${JSON.stringify(opts.scale)}`);
+  const opacityMin = opts.opacityMin ?? 0.01;
+  const limit = opts.limit ?? 250000;
+  const head = parsePlyHeader(b);
+  const ix = head.index.get("x"), iy = head.index.get("y"), iz = head.index.get("z");
+  if (ix === undefined || iy === undefined || iz === undefined) throw new PxError(".ply: missing x, y, z vertex properties");
+  const inx = head.index.get("nx"), iny = head.index.get("ny"), inz = head.index.get("nz");
+  const idc = [head.index.get("f_dc_0"), head.index.get("f_dc_1"), head.index.get("f_dc_2")];
+  const hasDc = idc.every((v) => v !== undefined);
+  const irgb = [head.index.get("red") ?? head.index.get("r"), head.index.get("green") ?? head.index.get("g"), head.index.get("blue") ?? head.index.get("b")];
+  const hasRgb = !hasDc && irgb.every((v) => v !== undefined);
+  const rgbUchar = hasRgb && (head.props[irgb[0]!].type === "uchar" || head.props[irgb[0]!].type === "uint8");
+  const io = head.index.get("opacity");
+  const isc = [head.index.get("scale_0"), head.index.get("scale_1"), head.index.get("scale_2")];
+  const hasScale = isc.every((v) => v !== undefined);
+  const irot = [head.index.get("rot_0"), head.index.get("rot_1"), head.index.get("rot_2"), head.index.get("rot_3")];
+  const hasRot = irot.every((v) => v !== undefined);
+  // Higher-order SH coefficients (f_rest_0 .. f_rest_{3*K-1})
+  const restIdx: number[] = [];
+  for (let k = 0; ; k++) {
+    const idx = head.index.get(`f_rest_${k}`);
+    if (idx === undefined) break;
+    restIdx.push(idx);
+  }
+  const shDeg = restIdx.length >= 45 ? 3 : restIdx.length >= 24 ? 2 : restIdx.length >= 9 ? 1 : 0;
+  const shRestPerSplat = shDeg === 3 ? 45 : shDeg === 2 ? 24 : shDeg === 1 ? 9 : 0;
+
+  // Filter by opacity and optionally cap count by importance (opacity * max scale)
+  const keepIdx: number[] = [];
+  const scores: number[] = [];
+  for (let i = 0; i < head.count; i++) {
+    const op = io !== undefined ? 1 / (1 + Math.exp(-head.get(i, io))) : 0.95;
+    if (op < opacityMin) continue;
+    keepIdx.push(i);
+    if (head.count > limit) {
+      const s = hasScale ? Math.exp(Math.max(head.get(i, isc[0]!), head.get(i, isc[1]!), head.get(i, isc[2]!))) : 0.05;
+      scores.push(op * s);
+    }
+  }
+  let chosen = keepIdx;
+  if (keepIdx.length > limit) {
+    const order = keepIdx.map((_, k) => k).sort((a, b) => scores[b] - scores[a]).slice(0, limit);
+    chosen = order.map((k) => keepIdx[k]);
+  }
+
+  const N = chosen.length;
+  const S = new Splats(N, [""]);
+  S.dc = new Float32Array(N * 3);
+  S.shYup = up === "y";
+  if (shDeg > 0) {
+    S.shDeg = shDeg;
+    S.shRest = new Float32Array(N * shRestPerSplat);
+  }
+  // Inverse of encodePly's -90 deg X rotation: +90 deg about X -> (qw, qx, 0, 0) = (SQRT1_2, +SQRT1_2, 0, 0)
+  const qw = Math.SQRT1_2, qx = Math.SQRT1_2;
+  const defaultRadius = 0.03 * scaleMul;
+
+  for (let o = 0; o < N; o++) {
+    const i = chosen[o];
+    const x = head.get(i, ix) * scaleMul, y = head.get(i, iy) * scaleMul, z = head.get(i, iz) * scaleMul;
+    if (up === "y") {
+      S.pos[o * 3] = x; S.pos[o * 3 + 1] = -z; S.pos[o * 3 + 2] = y;
+    } else {
+      S.pos[o * 3] = x; S.pos[o * 3 + 1] = y; S.pos[o * 3 + 2] = z;
+    }
+    if (inx !== undefined && iny !== undefined && inz !== undefined) {
+      const nx = head.get(i, inx), ny = head.get(i, iny), nz = head.get(i, inz);
+      const nl = Math.hypot(nx, ny, nz);
+      if (nl > 1e-6) {
+        if (up === "y") { S.normal[o * 3] = nx / nl; S.normal[o * 3 + 1] = -nz / nl; S.normal[o * 3 + 2] = ny / nl; }
+        else { S.normal[o * 3] = nx / nl; S.normal[o * 3 + 1] = ny / nl; S.normal[o * 3 + 2] = nz / nl; }
+      }
+    }
+    if (hasDc) {
+      S.dc[o * 3] = head.get(i, idc[0]!);
+      S.dc[o * 3 + 1] = head.get(i, idc[1]!);
+      S.dc[o * 3 + 2] = head.get(i, idc[2]!);
+    } else if (hasRgb) {
+      const div = rgbUchar ? 255 : 1;
+      S.dc[o * 3] = (head.get(i, irgb[0]!) / div - 0.5) / C0;
+      S.dc[o * 3 + 1] = (head.get(i, irgb[1]!) / div - 0.5) / C0;
+      S.dc[o * 3 + 2] = (head.get(i, irgb[2]!) / div - 0.5) / C0;
+    }
+    if (shDeg > 0 && S.shRest) {
+      for (let k = 0; k < shRestPerSplat; k++) S.shRest[o * shRestPerSplat + k] = head.get(i, restIdx[k]);
+    }
+    S.opacity[o] = io !== undefined ? 1 / (1 + Math.exp(-head.get(i, io))) : 0.95;
+    if (hasScale) {
+      S.scale[o * 3] = Math.exp(head.get(i, isc[0]!)) * scaleMul;
+      S.scale[o * 3 + 1] = Math.exp(head.get(i, isc[1]!)) * scaleMul;
+      S.scale[o * 3 + 2] = Math.exp(head.get(i, isc[2]!)) * scaleMul;
+    } else {
+      S.scale[o * 3] = defaultRadius; S.scale[o * 3 + 1] = defaultRadius; S.scale[o * 3 + 2] = defaultRadius;
+    }
+    if (hasRot) {
+      let rw = head.get(i, irot[0]!), rx = head.get(i, irot[1]!), ry = head.get(i, irot[2]!), rz = head.get(i, irot[3]!);
+      const rl = Math.hypot(rw, rx, ry, rz) || 1;
+      rw /= rl; rx /= rl; ry /= rl; rz /= rl;
+      if (up === "y") {
+        S.rot[o * 4] = qw * rw - qx * rx;
+        S.rot[o * 4 + 1] = qw * rx + qx * rw;
+        S.rot[o * 4 + 2] = qw * ry - qx * rz;
+        S.rot[o * 4 + 3] = qw * rz + qx * ry;
+      } else {
+        S.rot[o * 4] = rw; S.rot[o * 4 + 1] = rx; S.rot[o * 4 + 2] = ry; S.rot[o * 4 + 3] = rz;
+      }
+    } else {
+      S.rot[o * 4] = 1; S.rot[o * 4 + 1] = 0; S.rot[o * 4 + 2] = 0; S.rot[o * 4 + 3] = 0;
+    }
+    S.sun[o] = 1;
+    S.mat[o] = 0;
+  }
+  return S;
 }

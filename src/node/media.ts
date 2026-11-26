@@ -3,7 +3,7 @@
 // down as it is read: pixel art drawn at 2x and up to its own pixels (the grid found on the first
 // frame), anything else to 640 px on its long side, so a minute of video doesn't fill the memory.
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { PxError } from "../core/errors.ts";
@@ -42,7 +42,20 @@ export function webpInfo(buf: Uint8Array): { ms: number[]; lossless: boolean } |
 export function readMedia(path: string, o: MediaOpts = {}): Media {
   const ext = extname(path).toLowerCase(), max = o.max ?? 240;
   let read: (() => Img)[], ms: number[], kind: string, cleanup = () => {};
-  if (ext === ".png") { const img = decodePng(readFileSync(path)); read = [() => img]; ms = [100]; kind = "PNG"; }
+  const isDir = (() => { try { return statSync(path).isDirectory(); } catch { return false; } })();
+  if (isDir) {
+    // Frame folder: naturally sorted PNG sequence (frame1.png, frame2.png, ..., frame10.png)
+    const files = readdirSync(path).filter((f) => /\.png$/i.test(f)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+    if (!files.length) throw new PxError(`${path}: folder contains no .png frames`);
+    const fps = o.fps ?? 10, frameMs = Math.max(10, Math.round(1000 / fps));
+    const start = o.from ? Math.floor(o.from * fps) : 0;
+    const end = o.seconds ? Math.min(files.length, start + Math.ceil(o.seconds * fps)) : files.length;
+    const picked = files.slice(start, Math.min(end, start + max));
+    if (!picked.length) throw new PxError(`${path}: no frames in requested range (folder has ${files.length} PNGs)`);
+    read = picked.map((f) => () => decodePng(readFileSync(join(path, f))));
+    ms = picked.map(() => frameMs);
+    kind = `PNG folder, ${picked.length}${picked.length < files.length ? ` of ${files.length}` : ""} frames at ${fps} fps`;
+  } else if (ext === ".png") { const img = decodePng(readFileSync(path)); read = [() => img]; ms = [100]; kind = "PNG"; }
   else if (ext === ".gif") {
     // (a clip read from its start for some seconds: decoded only that far, the first frame's ms the measure)
     const buf = readFileSync(path), head = o.seconds && !o.from ? decodeGif(buf, 1).frames[0]?.ms || 100 : 0;

@@ -521,7 +521,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     // say so, and check its first frames only, not for hours
     const count = tl?.capped ? Math.min(all, CAPPED_FRAMES) : all;
     if (tl?.long) notes.push(`${name} › LOOK: ${tl.long}; check reads each of its frames (check: { every: n } reads one in n)`);
-    if (tl?.capped) lines.push(`${name} › WARNING: its loop doesn't close within 60 s: its anims' frame times don't line up (a ${tl.step} ms step, ${all} frames); checked its first ${count} frames only. Give every anim the same fps (4, 5 or 10, or ms in 100s)`);
+    if (tl?.capped) lines.push(`${name} › WARNING: its loop doesn't close within 60 s: its anims' frame times don't line up${tl.cappedBy ? ` (${tl.cappedBy})` : ""} (a ${tl.step} ms step, ${all} frames); checked its first ${count} frames only. Give every anim the same fps (4, 5 or 10, or ms in 100s) or set loop: "longest" on the scene`);
     const seen = new Map<string, string[]>(), found = new Map<string, Set<number>>(), at = new Map<string, Set<string>>(), used = new Set<string>();
     const only = opts.frames ?? (opts.frame !== undefined ? [opts.frame] : undefined), co = def.opts.check;
     // its rules (expect): at each frame checked, the placements they name

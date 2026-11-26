@@ -64,10 +64,12 @@ declare global {
     near?: string; within?: number;
   }
   interface PxTilemap extends PxPlace {
-    /** char -> asset; with corners, corner mask (0-15) -> asset, or a name prefix ("shore_" -> shore_<mask>). */
-    map: Record<string, string> | string;
+    /** char -> asset; with corners/sides, mask (0-15) -> asset, or prefix string ("shore_"); or (maskOrCh, col, row) => assetName | null for position-aware picking. */
+    map: Record<string, string> | string | ((key: string | number, col: number, row: number) => string | null | undefined);
     /** The map marks tile corners: these chars (true: any but "." and " ") are set; mask 1 TL + 2 TR + 4 BL + 8 BR. */
     corners?: boolean | string;
+    /** The map marks solid cells (side-view / platformer terrain): mask of open sides (1 top, 2 right, 4 bottom, 8 left open — matching sides()). */
+    sides?: boolean | string;
     iso?: boolean; size?: number; w?: number; h?: number; x?: number; y?: number;
   }
   interface PxRelight {
@@ -82,7 +84,7 @@ declare global {
   /** bubble(): the box a 9-slice `panel`, its `tail` down to the point (its top rows over the panel's bottom border), a `rule` under the title, the prompt `more` (an anim at frame `t`); `side` 1 right of the point, -1 left; its pixel `unit` of the art's (0.75); `pad` px in to the words (7). */
   interface PxBubble { panel: string; tail?: string; rule?: string; more?: string; font?: string; color?: PxColor | [PxColor, PxColor]; side?: number; t?: number; unit?: number; pad?: number }
   interface PxAssetOpts {
-    w?: number; h?: number; base?: string; /** with an anim as `base`: that frame of it (from 0), a still (without it the sprite plays the anim) */ frame?: number; mx?: boolean | "c"; my?: boolean | "c";
+    w?: number; h?: number; /** Background fill color drawn before items. */ bg?: PxColor; base?: string; /** with an anim as `base`: that frame of it (from 0), a still (without it the sprite plays the anim) */ frame?: number; mx?: boolean | "c"; my?: boolean | "c";
     /** Recolor after drawing; with a `base` from another file its keys are read in the base's palette, the new colors in yours. */
     swap?: Record<string, PxColor>;
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; angle?: number; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; outline?: PxColor; outline8?: PxColor; /** a line all round outside, each part in its own, one geometry every side: [ramps] dark to light, the first key the line away from the light, the second facing it, the rest the fill; an L's elbow takes the fill */ ink?: (string | string[])[]; crop?: boolean; layers?: boolean;
@@ -138,7 +140,7 @@ declare global {
     ground?: number | number[] | number[][];
   }
   /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
-  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "frame" | "png" | "normals" | "area" | "key" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register" | "genre"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number }; /** rules on its placements, run by pxl check and fixed by --fix */ expect?: PxRule2d[];
+  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "frame" | "png" | "normals" | "area" | "key" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register" | "genre"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** how stamped anim loops combine: "lcm" (default), "longest" (wrap shorter anims over longest child), or "hold" (hold shorter anims on frame 0 after one play) */ loop?: "lcm" | "longest" | "hold"; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number }; /** rules on its placements, run by pxl check and fixed by --fix */ expect?: PxRule2d[];
     /** px to an art pixel (w and h the picture's): mesh(), the 3D ops, meshSocket() and post() draw that many times as big */
     pixel?: number;
     /** the same scene k times as big under other names, not checked ({ name_hd: 4 }); post() runs only there */
@@ -379,7 +381,10 @@ declare global {
   interface PxSdf {
     readonly kind: "distance";
     union(...a: (PxSdf | { smooth?: PxNum })[]): PxSdf; subtract(...a: (PxSdf | { smooth?: PxNum })[]): PxSdf; intersect(...a: (PxSdf | { smooth?: PxNum })[]): PxSdf;
-    at(x: PxNum | PxVec, y?: PxNum, z?: PxNum): PxSdf; rotate(deg: PxNum, axis?: "x" | "y" | "z" | PxVec): PxSdf; scale(s: PxNum | PxVec): PxSdf;
+    at(x: PxNum | PxVec, y?: PxNum, z?: PxNum): PxSdf; rotate(deg: PxNum, axis?: "x" | "y" | "z" | PxVec): PxSdf;
+    /** align direction `from` onto `to` via minimal quaternion rotation */ orient(from: PxVec, to: PxVec): PxSdf;
+    scale(s: PxNum | PxVec): PxSdf;
+    /** offset surface outward (d > 0) or inward (d < 0) by d m */ grow(d: PxNum): PxSdf;
     /** degrees a meter up */ twist(deg: PxNum): PxSdf;
     /** a point z m up moved k z^2 / 2 m along x (or [kx, ky]) */ bend(k: PxNum | PxVec): PxSdf;
     mirror(axes?: string): PxSdf; repeat(step: PxVec, count?: PxNum | PxVec): PxSdf;
@@ -431,7 +436,10 @@ declare global {
   /** splats()'s options: made here from a field or density (spacing, size, seed), the view, materials' ramps or one ramp, the light, dither/cut/alpha where thin, the outline, a cell of K x K px. */
   interface PxSplatOpts {
     spacing?: number; size?: number; seed?: number; view?: PxSurfaceView; ppm?: number; at?: number[];
-    mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; ramp?: string | PxColor[]; light?: number[] | "view"; blend?: "dither" | "cut" | "alpha"; outline?: boolean; pixel?: number; part?: string;
+    mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; ramp?: string | PxColor[]; light?: number[] | "view"; blend?: "dither" | "cut" | "alpha"; outline?: boolean;
+    /** cast ground shadows onto z = floor (true steps ramp down, key plots exact shadow key, or { color?, floor?, opacity? }) */ cast?: boolean | string | { color?: string; floor?: number | "min"; opacity?: number };
+    /** for imported 3DGS .ply splats: snap SH RGB to active palette (default true; false keeps true RGB) */ palette?: boolean;
+    pixel?: number; part?: string;
   }
   /** sdf.scatter's options: on a material or where, how many a square meter, facing up, lit only, turned, sizes, the brush, tone steps, its material, seed, light, flutter. */
   interface PxScatterOpts {
@@ -465,8 +473,8 @@ declare global {
   interface PxDraw3dOpts { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view" | "mesh"; pixel?: number; only?: string[]; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown> }
   /** A figure's pose, the file's own numbers: each foot [forward, right] on the floor from under the pelvis (left, right), lifted (the whole foot), each foot turned out from the hips' forward (toes, deg: its knee over it) and its heel raised (heel, px: the foot turned on its ball, the toes on the floor); the pelvis down; leaning forward and to the right (deg); the hips turned from the heading, the shoulders against them, the head against those (deg, clockwise from above); each hand [forward, right, up] from its shoulder, the way the elbows bend (elbow: a hint [forward, out, up] in the shoulders' frame, out mirrored for the left arm; default [-0.4, 0.5, -1], mostly down), in the air (air: the frame's data says so, pxl check doesn't ask its feet to be on the ground), or both on one line (grip: its ends [forward, right, up] from under the pelvis as the shoulders face, each hand `at` its share of the way, [left, right]). Other keys pass to parts(). */
   interface PxPose { feet?: number[][]; lift?: number[]; /** each foot's heading, degrees out from the hips' forward [left, right] (its knee over it) */ toes?: number[]; /** px each heel is raised [left, right], the foot turned on its ball */ heel?: number[]; /** degrees each foot off the floor turns at its ankle from square to its shin [left, right] (+ pointed, - flexed; null the rig's level foot), its toes the way its knee points */ point?: (number | null)[]; down?: number; rise?: number; /** both feet px farther from us along the view's depth (rig3d's soles sets it by heading) */ away?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; /** elbow bend hint [forward, out, up] for both arms, or per-arm [left, right] / { l?, r? } */ elbow?: PxV3 | [PxV3, PxV3] | { l?: PxV3; r?: PxV3 }; air?: boolean; grip?: { from: PxV3; to: PxV3; at: [number, number] }; /** degrees the whole figure, posed upright, is turned in the picture's plane about its pelvis (+ its head toward the picture's left): a fall, lying down; its parts built upright and turned with it */ roll?: number; /** degrees the neck (the chest to the head's middle) stands from upright as drawn, turned to it in the picture's plane about the chest (+ its head toward the picture's right: the chin on the chest); none: along the spine */ nod?: number; [k: string]: unknown }
-  /** A piece of a figure's part: a field, and its paint: a material (a ramp of keys or a name in mats) or (h along it 0..1, a round it from the way the body faces, outside) => one. */
-  interface PxPiece { field: PxSdf; paint?: string | ((h: number, a: number, outside: boolean) => string | null | undefined) }
+  /** A piece of a figure's part: a field, and its paint: a material (a ramp of keys or a name in mats) or (h along it 0..1, a round it from the way the body faces, outside, normal) => one. */
+  interface PxPiece { field: PxSdf; paint?: string | ((h: number, a: number, outside: boolean, normal: PxV3) => string | null | undefined) }
   /** The joints a pose puts where at a heading, in the sprite's px (x across, y away from us, z up); limb() and ball() make pieces along them; screen() where a point lands on the sprite, depth() how near us it is. */
   interface PxJoints {
     heading: number; f: PxV3; r: PxV3; up: PxV3; spine: PxV3; pelvis: PxV3; chest: PxV3; head: PxV3;
@@ -475,12 +483,14 @@ declare global {
     legs: { hip: PxV3; knee: PxV3; ankle: PxV3; foot: PxV3; heel: PxV3; ball: PxV3; toe: PxV3; heading: number; /** the pose's point for this foot, when it gives one: the sole then lies square to the shin turned that far */ point?: number }[]; arms: { sh: PxV3; elbow: PxV3; hand: PxV3 }[];
     /** the pose's grip, [from, to]: the line the hands hold */
     grip?: [PxV3, PxV3];
-    /** in a draw hook: a line of pixels from a to b in the figure's own depth (a held broom), paint a key or (t) => key along it; `{ behind: true }` draws only behind the figure */
-    rod(a: PxV3, b: PxV3, paint: string | ((t: number) => string | undefined), opts?: { behind?: boolean }): void;
-    /** in a draw hook: a 3D blade/motion smear along tip points `PxV3[]` or `[root, tip][]` pairs, depth-tested against the figure (`{ behind: true }` only behind it) */
-    smear(path: (PxV3 | [PxV3, PxV3])[], width: number | ((t: number) => number), paint: string | ((t: number, u: number) => string | undefined), opts?: { behind?: boolean }): void;
+    /** in a draw hook: a line of pixels from a to b in the figure's own depth (a held broom), paint a key or (t) => key along it; `{ behind: true }` only behind, `{ over: true }` unconditionally on top */
+    rod(a: PxV3, b: PxV3, paint: string | ((t: number) => string | undefined), opts?: { behind?: boolean; over?: boolean }): void;
+    /** in a draw hook: a 3D blade/motion smear along tip points `PxV3[]` or `[root, tip][]` pairs, depth-tested against the figure (`{ behind: true }` only behind, `{ over: true }` unconditionally on top) */
+    smear(path: (PxV3 | [PxV3, PxV3])[], width: number | ((t: number) => number), paint: string | ((t: number, u: number) => string | undefined), opts?: { behind?: boolean; over?: boolean }): void;
     limb(a: PxV3, b: PxV3, r0: number, r1?: number, paint?: PxPiece["paint"]): PxPiece;
     ball(c: PxV3, r: number | PxV3, paint?: PxPiece["paint"]): PxPiece;
+    /** smooth-union multiple pieces/fields into one seamless SDF part, keeping each piece's material/paint and optionally tagging with `part` */
+    union(pieces: (PxPiece | PxSdf)[], opts?: { smooth?: PxNum; part?: string }): PxSdf;
     /** a surface swept round an upright through base from z0 up to z1: keep(h, a) the part there is, shift(h) [dx, dy] that height carried off the axis, shell half its thickness (a cloth) */
     sweep(base: PxV3, z0: number, z1: number, radius: (h: number, a: number) => number, o?: { keep?: (h: number, a: number) => unknown; shift?: (h: number) => number[]; shell?: number; paint?: PxPiece["paint"] }): PxPiece;
     /** hand-drawn pixel art pinned on the figure at point, its other views by the angle (as decal()) */
@@ -728,6 +738,12 @@ declare global {
   interface PxEmit extends PxEffectBase { color?: PxColor; strength?: number; pulse?: number; keep?: boolean }
   /** sway: rows moved sideways by their height over the base, `amount` px at the top (negative: to the left), `lean` of it always downwind, `cycles` a loop. */
   interface PxSway extends PxEffectBase { amount?: number; lean?: number; power?: number; still?: number; cycles?: number; flutter?: number; vary?: number; pixel?: number;
+    /** expand canvas horizontally on both sides (true = auto from |amount| + flutter + 1, or px) so closely-cropped sprites sway without clipping */
+    pad?: boolean | number;
+    /** custom wave shape over loop phase 0..1 (replaces default sin wave, e.g. gust overshoot & settle) */
+    profile?: (phase: number) => number;
+    /** phase delay (0..1) at the top relative to the base for travelling whip/foliage motion */
+    lag?: number;
     /** something passing through at column `push` (px from the left): the stems within `reach` px bent away from it, `bend` px at the top */
     push?: number; reach?: number; bend?: number;
     /** what moves painted instead of by height: an asset of the same size, each pixel's lightness its share (white all, black and clear none) */
@@ -783,7 +799,11 @@ declare global {
     rng(seed?: number): () => number;
     /** An asset's size as it would be placed (a group's first member), for layouts. */
     size(name: string): { w: number; h: number };
-    clip(where: PxRegion, fn: () => void): void;
+    /** Read-only built image of an asset (or anim frame) for pixel/bounds inspection without joining its animation loop to a scene. */
+    asset(name: string, frame?: number): { readonly w: number; readonly h: number; readonly data: Uint32Array; get(x: number, y: number): number };
+    /** Frame data written via setData() on an asset or anim frame (defaults to current frame). */
+    data(name: string, frame?: number): Record<string, unknown> | undefined;
+    clip(where: PxRegion, fn: (c: PxCanvas) => void): void;
     /** Draw on a plate of its own, lit there with relight's opts, then lay it down. */
     plate(fn: () => void, opts?: PxRelight): void;
     /** Draw `fn` on a sheet of its own and lay it down moved by (dx, dy), between pixels too (subpixel). */
@@ -814,8 +834,8 @@ declare global {
     dither(x: number, y: number, w: number, h: number, c1: PxColor, c2: PxColor, density?: number): void;
     grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h" | "r", soft?: number, seam?: "dither" | "lines"): void;
     noise(x: number, y: number, w: number, h: number, colors: string | string[], density?: number, seed?: number, on?: string): void;
-    shade(where?: PxRegion, steps?: number, density?: number): void;
-    light(where?: PxRegion, steps?: number, density?: number): void;
+    shade(where?: PxRegion, steps?: number, density?: number | ((x: number, y: number) => number)): void;
+    light(where?: PxRegion, steps?: number, density?: number | ((x: number, y: number) => number)): void;
     relight(where?: PxRegion, opts?: PxRelight): void;
     /** Gradient map: the region's colors, dark to light, take the ramp's keys in order (hue: only colors of that hue). */
     rampmap(ramp: string | string[], opts?: { where?: PxRegion; hue?: [number, number] }): void;
@@ -885,7 +905,7 @@ declare global {
     shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): void;
     /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
     terrain(view: PxView | PxPerspective, height: (x: number, z: number) => number, fn: (x: number, z: number, u: number, t: number, col: number, row: number) => PxColor | null | undefined, opts?: PxTerrainOpts): void;
-    recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): void;
+    recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number | ((x: number, y: number) => number)): void;
     stamp(name: string, x?: number, y?: number | "ground", opts?: PxPlace): void;
     stamp(name: string, opts: PxPlace): void;
     tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): void;
@@ -893,7 +913,7 @@ declare global {
     panel(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): void;
     tilemap(map: string, opts: PxTilemap): void;
     scatter(name: string, x: number, y: number, w: number, h: number, count: number, opts?: PxScatter): void;
-    grid(x: number, y: number, str: string): void;
+    grid(x: number, y: number, str: string, opts?: { flip?: "x" | "y" | "xy" }): void;
     runs(rows: Record<number, [number, string][]>): void;
     pose(joints: Record<string, number[]>, opts?: PxPose): void;
     wire(x0: number, y0: number, x1: number, y1: number, sag: number, c: PxColor, opts?: PxWire): void;
@@ -964,7 +984,7 @@ declare global {
    * else their index), a group of them; through an orthographic view or a perspective() camera; the east
    * the west flipped where the thing is its own mirror and its light from the picture's middle (mirror: "auto").
    */
-  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown>; draw?: (c: PxCanvas, v: { heading: string; screen(p: number[]): number[]; depth(p: number[]): number }) => void; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number; /** "foot": each sprite's pivot on its drawn foot (its data's foot: the lowest row over where it meets the ground), not the origin */ pivot?: "foot"; /** true: carry the builder's 3D sockets to each heading; or { name: [x, y, z] } in m projected onto each sprite */ sockets?: boolean | Record<string, [number, number, number]>; /** the genre() its sprites are made for */ genre?: string; /** what they are by its ink (character, tree, prop) */ category?: string }): PxTurnaround;
+  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown>; draw?: (c: PxCanvas, v: { heading: string; screen(p: number[]): number[]; depth(p: number[]): number }) => void; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number; /** "foot": pivot on drawn foot; "front": pivot on front-most ground contact edge [originX, maxFootprintY] */ pivot?: "foot" | "front"; /** true: carry the builder's 3D sockets to each heading; or { name: [x, y, z] } in m projected onto each sprite */ sockets?: boolean | Record<string, [number, number, number]>; /** the genre() its sprites are made for */ genre?: string; /** what they are by its ink (character, tree, prop) */ category?: string }): PxTurnaround;
   /**
    * A figure on the 3D layer: a skeleton (`body`) posed per frame by the file's own `pose(i, heading)`,
    * its parts fields along the bones (`parts(j, pose)`: j.limb, j.ball or fields, each painted by a
@@ -973,7 +993,7 @@ declare global {
    * light is in the picture's middle; `head` a views() set stamped on the head (`chin` a line under it).
    * `blocks`: the flat blocks too (bk_<move>_<dir>, or that prefix), to judge a move before painting.
    */
-  function rig3d(name: string, opts: { body?: PxBody; moves: Record<string, { frames: number; /** each frame's (100), or a list, a number a frame */ ms?: number | number[]; pose: (i: number, heading: number) => PxPose; dirs?: string[]; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void; /** optional per-move canvas size & pivot overriding the rig's */ w?: number; h?: number; pivot?: [number, number] }>;
+  function rig3d(name: string, opts: { body?: PxBody; moves: Record<string, { frames: number; /** each frame's (100), or a list, a number a frame */ ms?: number | number[]; pose: (i: number, heading: number) => PxPose; dirs?: string[]; /** optional per-move compass headings overriding or restricting the rig's headings */ headings?: (string | number)[]; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void; /** optional per-move canvas size & pivot overriding the rig's */ w?: number; h?: number; pivot?: [number, number] }>;
     n?: number; headings?: (string | number)[]; pitch?: number; w?: number; h?: number; pivot?: [number, number]; parts?: (j: PxJoints, pose: PxPose) => Record<string, PxPiece | PxSdf | { decal: object } | { scatter: object } | (PxPiece | PxSdf | { decal: object } | { scatter: object })[]>;
     mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; /** with ink: "dark", the line on the part behind its darkest tone, the ink only all round */ inner?: boolean | PxColor | "dark"; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; /** a views() set stamped on the head, or (pose, j) => one: its set by the pose */ head?: string | ((pose: PxPose, j: PxJoints) => string); /** the parts kept over the head where nearer than it (array with prefix match, "depth" for per-pixel all parts, or { parts, mode: "part" | "pixel" }) */ over?: string[] | "depth" | { parts: string[]; mode?: "part" | "pixel" }; /** the line under the head; a head modeled: [key, the skin's ramp], under the jaw only */ chin?: PxColor | [PxColor, string]; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void; /** the genre() its painted moves are made for */ genre?: string; /** what they are by its ink (character) */ category?: string; /** each heading's feet moved along the view's depth so the soles end on the row they do facing us */ soles?: boolean }): PxRig3d;
   namespace rig3d {
@@ -987,7 +1007,7 @@ declare global {
    * their crown and chin to one row, and with `like` each row within a pixel of that set's.
    */
   /** A head modeled (a field in its own frame), drawn once per view (the west, the east mirrored where the light is in the middle), each view's `retouch` grid painted over it ("." keeps, "_" erases), its `anchor` on the head's middle. */
-  function views(name: string, field: PxSdf, opts?: { n?: 8 | 16; pitch?: number; light?: PxVec; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: [string, string]; /** turned 45 to 90 degrees, the cheek closed into the chin this many px deep (with ink and jaw) */ jowl?: number; /** a bald crown's shine: of the skin's lightest blob on the dome only a dash this many px long a pixel under its top, centred where the light falls, the rest a step down (with jaw) */ crown?: number; anchor?: [number, number] | Record<string, [number, number]>; retouch?: Record<string, string>; like?: string; chin?: number; swap?: Record<string, PxColor> }): string[];
+  function views(name: string, field: PxSdf, opts?: { n?: 8 | 16; pitch?: number; light?: PxVec; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: [string, string]; /** turned 45 to 90 degrees, the cheek closed into the chin this many px deep (with ink and jaw) */ jowl?: number; /** a bald crown's shine: of the skin's lightest blob on the dome only a dash this many px long a pixel under its top, centred where the light falls, the rest a step down (with jaw) */ crown?: number; anchor?: [number, number] | Record<string, [number, number]>; /** per-view retouch grid strings, part-masked `{ grid, on }` entries, or `false` to disable retouch */ retouch?: false | Record<string, string | { grid: string; on?: string | string[] }>; like?: string; chin?: number; swap?: Record<string, PxColor> }): string[];
   function views(name: string, grids: Record<string, string | string[] | PxItem[]>, opts?: { anchor?: [number, number] | "center" | "bottom" | Record<string, [number, number] | "center" | "bottom">; like?: string; /** the chin's row in every grid (a set whose lowest rows aren't the chin: a beard) */ chin?: number; swap?: Record<string, PxColor>; outline?: PxColor; outline8?: PxColor; inline?: PxColor; selout?: boolean | number }): string[];
   /** A walk's numbers at t (0..1 over the cycle) by the view a heading gives (or `view`): each foot [forward, up], the body's dip, each hand [forward, up] from hanging; the guide's measured values, each overridable (`stride`, `lift`, `bob`, `hands`; for one view: `profile: { stride }`). */
   function gait(t: number, opts?: { heading?: number; view?: "front" | "back" | "diagonal" | "profile"; stride?: number | number[]; lift?: number | number[]; bob?: number[]; hands?: number[][]; front?: object; diagonal?: object; profile?: object }): { view: string; a: number; feet: [number, number][]; bob: number; hands: [number, number][]; pace: number };
@@ -1000,8 +1020,11 @@ declare global {
    * "nature.lamp" here), its own drawing finding its own first; JavaScript names still share one scope.
    */
   function include(path: string, opts?: { palette?: boolean | "mine"; as?: string }): void;
-  /** In a kit, at its top level: the full name of an asset, group or font it defines, under the `as` it was included with (`own("_parchment")` is "dialog._parchment" under as: "dialog", "_parchment" without one): for names a kit hands out in constants. */
-  function own(name: string): string;
+  /** In a kit, at its top level: the full name of an asset, group or font it defines, under the `as` it was included with (`own("_parchment")` is "dialog._parchment" under as: "dialog", "_parchment" without one); `own()` with no arg or `own.prefix` returns the prefix ("dialog." or ""). */
+  function own(name?: string): string;
+  namespace own { const prefix: string; }
+  /** Print diagnostic values during pxl build / pxl shot without throwing (deduplicated per build). */
+  function log(...args: unknown[]): void;
   function rng(seed?: number): () => number;
   /** A number in [0, 1) for a lattice point (integers): the same (i, j) always gives the same. */
   function hash(i: number, j: number, seed?: number): number;
@@ -1081,8 +1104,10 @@ declare global {
   function shake(spell: PxSpell): PxOp;
   /** A function of (x, y) made to close over w (and h): for noise on strips and tiles that wrap. */
   function seamless(fn: (x: number, y: number) => number, w: number, h?: number): (x: number, y: number) => number;
-  /** A corner terrain's 16 pieces, `prefix_<mask>` (variants: `prefix_<mask>_<v>` and a group), from fn(x, y, t, v): t how much terrain the corners give that pixel; null leaves it clear. */
-  function corners(prefix: string, opts: { size: number; variants?: number; smooth?: boolean }, fn: (x: number, y: number, t: number, v: number) => PxColor | null | undefined): void;
+  /** A corner terrain's 16 pieces, `prefix_<mask>` (variants: `prefix_<mask>_<v>` and a group), from fn(x, y, t, v, mask): t how much terrain the corners give that pixel; mask 0..15; null leaves it clear. */
+  function corners(prefix: string, opts: { size: number; variants?: number; smooth?: boolean }, fn: (x: number, y: number, t: number, v: number, mask: number) => PxColor | null | undefined): void;
+  /** A side-view / platformer terrain's 16 edge-mask pieces, `prefix_<mask>` (mask bits: 1 top, 2 right, 4 bottom, 8 left open), passing distances to each open edge. */
+  function sides(prefix: string, opts: { size: number; variants?: number }, fn: (x: number, y: number, info: { mask: number; top: number; right: number; bottom: number; left: number; edge: number }, v: number) => PxColor | null | undefined): void;
   /** A ground (or a ceiling) as a polyline [x0, y0, x1, y1, ...], x going up: (x) => its row there, rounded. */
   function profile(pts: number[]): (x: number) => number;
   /** A path as a polyline [x0, y0, x1, y1, ...] px, its corners rounded `round` px: (x, y) => [s, u], how far along it (px) and to its right (px, negative to its left); `.total` its length along. */
@@ -1130,6 +1155,12 @@ declare global {
     sphere(r: PxNum): PxSdf; box(size: PxVec | PxNum, o?: { round?: PxNum }): PxSdf; capsule(a: PxVec, b: PxVec, r: PxNum, r2?: PxNum): PxSdf;
     cylinder(r: PxNum, h: PxNum): PxSdf; cone(r: PxNum, h: PxNum, top?: PxNum): PxSdf; torus(R: PxNum, r: PxNum): PxSdf;
     plane(n?: PxVec, h?: PxNum): PxSdf; ellipsoid(r: PxVec): PxSdf;
+    /** revolve a 2D [radius, z] profile around the Z axis (pots, barrels, goblets, domes) */
+    lathe(pts: [number, number][], o?: { round?: PxNum }): PxSdf;
+    /** extrude a 2D [x, y] polygon along Z from 0 to h (blades, shields, roofs) */
+    prism(pts: [number, number][], h: PxNum, o?: { round?: PxNum }): PxSdf;
+    /** align a field's direction `from` onto `to` via minimal quaternion rotation */
+    orient(f: PxSdf, from: PxVec, to: PxVec): PxSdf;
     /** a field of the file's own: its distance at a point (or less), inside the box lo..hi */
     field(d: (x: number, y: number, z: number) => number, lo: [number, number, number], hi: [number, number, number]): PxSdf;
     union(...a: (PxSdf | PxSdf[] | { smooth?: PxNum })[]): PxSdf; intersect(...a: (PxSdf | PxSdf[] | { smooth?: PxNum })[]): PxSdf;
@@ -1143,8 +1174,8 @@ declare global {
     voxels(f: PxSdf, o: { size: number | number[]; fill?: number; clock?: PxClock }): PxVoxels;
     /** the field as a mesh by surface nets, cells `size` m */
     mesh(f: PxSdf, o: { size: number | number[]; clock?: PxClock }): PxMesh3;
-    /** splats from a field's surface (flat discs) or a density's inside (round blobs), spacing m apart */
-    splats(f: PxSdf | PxDensity, o?: { spacing?: number; size?: number; seed?: number; light?: number[]; thickness?: number; clock?: PxClock }): PxSplats;
+    /** splats from a field's surface, a density's inside, or an imported 3DGS .ply file (path relative to the art file, binary LE or ASCII, SH degrees 0..3) */
+    splats(f: PxSdf | PxDensity | string, o?: { spacing?: number; size?: number; seed?: number; light?: number[]; thickness?: number; clock?: PxClock; scale?: number; up?: "y" | "z"; minOpacity?: number; max?: number }): PxSplats;
     /** details scattered on a field's surface, drawn as pixel-art brushes by splats() */
     scatter(f: PxSdf, o?: PxScatterOpts): PxSplats;
   };
@@ -1216,8 +1247,8 @@ declare global {
   function dither(x: number, y: number, w: number, h: number, c1: PxColor, c2: PxColor, density?: number): PxOp;
   function grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h" | "r", soft?: number, seam?: "dither" | "lines"): PxOp;
   function noise(x: number, y: number, w: number, h: number, colors: string | string[], density?: number, seed?: number, on?: string): PxOp;
-  function shade(where?: PxRegion, steps?: number, density?: number): PxOp;
-  function light(where?: PxRegion, steps?: number, density?: number): PxOp;
+  function shade(where?: PxRegion, steps?: number, density?: number | ((x: number, y: number) => number)): PxOp;
+  function light(where?: PxRegion, steps?: number, density?: number | ((x: number, y: number) => number)): PxOp;
   /** Volume for flat art: edges facing the light step lighter along their ramp, edges facing away darker. */
   function relight(where?: PxRegion, opts?: PxRelight): PxOp;
   /** Gradient map onto a ramp: colors sorted dark to light take its keys in order, so imported tones never merge (hue: [from, to] picks colors). */
@@ -1230,7 +1261,7 @@ declare global {
   function warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): PxOp;
   /** A shader's effect on everything drawn before it (a sprite, an anim's frame, a layer), on the clock and a seed: dissolve, pixelate, dither, tint, distort, sway, emit. */
   function effect(...fx: PxEffect): PxOp;
-  function recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): PxOp;
+  function recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number | ((x: number, y: number) => number)): PxOp;
   function stamp(name: string, x?: number, y?: number | "ground", opts?: PxPlace): PxOp;
   function stamp(name: string, opts: PxPlace): PxOp;
   function tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): PxOp;
@@ -1239,7 +1270,7 @@ declare global {
   function panel(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): PxOp;
   function tilemap(map: string, opts: PxTilemap): PxOp;
   function scatter(name: string, x: number, y: number, w: number, h: number, count: number, opts?: PxScatter): PxOp;
-  function grid(x: number, y: number, str: string): PxOp;
+  function grid(x: number, y: number, str: string, opts?: { flip?: "x" | "y" | "xy" }): PxOp;
   /** Runs at absolute x, row by row: { 30: [[19, "3H3"], [23, "deeR"]] }. Same keys as grid. */
   function runs(rows: Record<number, [number, string][]>): PxOp;
   /** A pose skeleton from a detector's JSON file (or a { name: [x, y, score] } map), as a guide. */

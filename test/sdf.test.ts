@@ -467,3 +467,54 @@ turnaround("asym", S, { headings: ["w", "e"], ppm: 16, mats: { m: "kgrw" }, sock
   // whereas mirroring would have reflected a non-centered x; check y differs slightly due to pitch (behind vs in front of center)
   assert.notEqual(asymW.sockets.side[1], asymE.sockets.side[1], "asymmetric 3D socket projects its true depth-shifted height in w vs e");
 });
+
+test("sdf Wave A+B: orient, grow, lathe, prism, closed half-space polytopes, and turnaround pivot: 'front'", () => {
+  // 1. field.orient(origin, U, E?) and sdf.orient(...)
+  const cyl = sdf.cylinder(0.4, 2).orient([1, 2, 0], [1, 0, 0]);
+  near(D(cyl, [2, 2, 0]), -0.4, 1e-6, "center along +x oriented cylinder");
+  near(D(cyl, [3.5, 2, 0]), 0.5, 1e-6, "past tip along +x");
+  const anti = sdf.orient(sdf.cylinder(0.5, 2), [0, 0, 2], [0, 0, -1]);
+  near(D(anti, [0, 0, 1]), -0.5, 1e-6, "anti-parallel orient along -z");
+  near(D(anti, [0, 0, -1]), 1, 1e-6, "below -z tip");
+  const orientedFrame = sdf.box([2, 0.4, 0.4]).orient([0, 0, 0], [0, 1, 0], [0, 0, 1]);
+  assert.ok(D(orientedFrame, [0, 0, 0.8]) < 0 && D(orientedFrame, [0.8, 0, 0]) > 0, "explicit E axis aligns local x");
+
+  // 2. field.grow(t)
+  const sp = sdf.sphere(1);
+  near(D(sp.grow(0.3), [1.3, 0, 0]), 0, 1e-9, "positive grow expands surface");
+  near(D(sp.grow(-0.2), [0.8, 0, 0]), 0, 1e-9, "negative grow shrinks surface");
+
+  // 3. sdf.lathe(pts, { closed? })
+  const vase = sdf.lathe([[0.6, 0], [0.9, 0.5], [0.4, 1.2], [0.6, 1.6]]);
+  assert.ok(D(vase, [0, 0, 0.5]) < 0, "inside vase center");
+  near(D(vase, [0.9, 0, 0.5]), 0, 1e-6, "on belly");
+  assert.ok(D(vase, [0.7, 0, 1.2]) > 0.2, "outside narrow neck");
+  const ringTube = sdf.lathe([[1.2, 0], [1.6, 0], [1.6, 0.4], [1.2, 0.4]], { closed: true });
+  assert.ok(D(ringTube, [1.4, 0, 0.2]) < 0 && D(ringTube, [0, 0, 0.2]) > 1, "closed lathe profile leaves hollow center");
+
+  // 4. sdf.prism(pts, depth)
+  const tri = sdf.prism([[-1, 0], [1, 0], [0, 2]], 1.0);
+  assert.ok(D(tri, [0, 0.5, 0]) < 0, "inside triangular prism");
+  near(D(tri, [0, 0.5, 0.5]), 0, 1e-6, "on top cap (depth/2)");
+  assert.ok(D(tri, [0, 0.5, 1.2]) > 0.5 && D(tri, [0, -0.5, 0]) > 0.4, "outside prism");
+
+  // 5. Closed half-space polytope via sdf.intersect(planes...) computes finite bounds and renders via surface()
+  const pyramid = sdf.intersect(
+    sdf.plane([0, 0, -1], 0),
+    sdf.plane([1, 0, 1], 1),
+    sdf.plane([-1, 0, 1], 1),
+    sdf.plane([0, 1, 1], 1),
+    sdf.plane([0, -1, 1], 1),
+  ).mat("m");
+  const [plo, phi] = pyramid.bounds();
+  assert.ok(plo.every(Number.isFinite) && phi.every(Number.isFinite), `polytope bounds finite: ${JSON.stringify([plo, phi])}`);
+  near(plo[2], 0, 1e-6); near(phi[2], 1, 1e-6);
+  const p = loadSource(PAL + `
+const pyr = sdf.intersect(sdf.plane([0, 0, -1], 0), sdf.plane([1, 0, 1], 1), sdf.plane([-1, 0, 1], 1), sdf.plane([0, 1, 1], 1), sdf.plane([0, -1, 1], 1)).mat("m")
+sprite("pyr", { w: 32, h: 32 }, surface(pyr, { view: "iso", ppm: 10, at: [16, 26], mats: { m: "kgrw" } }))
+const tall = sdf.box([0.6, 1.6, 1.0]).at(0, 0, 0.5).mat("m")
+turnaround("pf", tall, { headings: ["s", "w"], ppm: 14, view: { kind: "side", pitch: 25 }, mats: { m: "kgrw" }, pivot: "front" })`, "t.px.js");
+  assert.ok(p.image("pyr").bounds() !== null, "closed half-space polytope renders without manual box clip");
+  const pfs = p.image("pf_s"), pfsB = pfs.bounds()!;
+  assert.ok(pfs.pivot && Math.abs(pfs.pivot[1] - (pfsB.y + pfsB.h)) <= 1, `pivot: "front" lands on lowest drawn row (${pfs.pivot?.[1]} vs ${pfsB.y + pfsB.h})`);
+});

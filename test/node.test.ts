@@ -1505,3 +1505,208 @@ sprite("a", { w: 4, h: 4 }, (c) => { n++; c.rect(0, 0, 4, 4, n === 1 ? "r" : "g"
   p2.evict("a");
   assert.equal(p2.image("a").get(0, 0), p2.pal.resolve("g"), "rebuilt after evict");
 });
+
+test("Wave C CLI: log(), multi-name ascii, compare --anchor/auto-anchor, shot --vs <dir> & --gif --vs, normWinSpec, build --profile slowest files", async () => {
+  const { normWinSpec } = await import("../src/node/cli.ts");
+  assert.equal(normWinSpec("/c/projects/art.px.js:hero"), "C:/projects/art.px.js:hero");
+  assert.equal(normWinSpec("/d/foo/bar.png"), "D:/foo/bar.png");
+  assert.equal(normWinSpec("relative/a.px.js:s"), "relative/a.px.js:s");
+
+  const dir = mkdtempSync(join(tmpdir(), "pxl-wc-"));
+  const run = async (argv: string[]) => {
+    const out: string[] = [], logFn = console.log;
+    console.log = (s: string) => out.push(String(s));
+    try { const code = await main(argv); return { code, out: out.join("\n") }; } finally { console.log = logFn; }
+  };
+  try {
+    const f1 = join(dir, "a.px.js");
+    writeFileSync(f1, `pal({ k: "#111111", r: "#cc3333", g: "#33aa33", w: "#eeeeee" })
+log("hello-from-dsl", 42)
+sprite("s1", { w: 4, h: 4, pivot: [2, 4] }, rect(1, 1, 2, 3, "r"))
+sprite("s2", { w: 8, h: 6, pivot: [4, 6] }, rect(3, 3, 2, 3, "g"))
+anim("mv", { w: 4, h: 4, frames: 2, fps: 4 }, (c, fi) => c.px(fi, 0, "r"))`);
+    const out1 = join(dir, "out1"), out2 = join(dir, "out2");
+
+    // 1. log() printed by build & shot + profileReport reports slowest files written
+    const b1 = await run(["build", f1, "--no-preview", "--profile", "--out", out1]);
+    assert.equal(b1.code, 0);
+    assert.match(b1.out, /hello-from-dsl 42/);
+    const { profileReport } = await import("../src/node/profile.ts");
+    const rep = profileReport({ nodes: [{ id: 1, callFrame: { functionName: "(root)", url: "", lineNumber: -1 } }], samples: [1], timeDeltas: [1000] } as never, [], [], undefined, undefined, undefined, 10, [{ file: "anims/hero.gif", bytes: 245000, ms: 42 }]);
+    assert.match(rep, /slowest files written: anims\/hero\.gif \(239 KB, 42 ms\)/);
+    const shLog = await run(["shot", f1, "s1", "--scale", "1", "--out", join(dir, "s1.png")]);
+    assert.equal(shLog.code, 0);
+    assert.match(shLog.out, /hello-from-dsl 42/);
+
+    // 2. Multi-name pxl ascii
+    const asc = await run(["ascii", f1, "s1", "s2", "--trim"]);
+    assert.equal(asc.code, 0);
+    assert.match(asc.out, /=== s1 ===/);
+    assert.match(asc.out, /=== s2 ===/);
+
+    // 3. pxl compare auto-anchor for differing-size pivoted assets & explicit --anchor
+    const cmpAuto = await run(["compare", f1, "s1", "s2", "--pixels"]);
+    assert.equal(cmpAuto.code, 0);
+    assert.match(cmpAuto.out, /aligned by pivot/i);
+    const cmpExp = await run(["compare", f1, "s1", "s2", "--anchor"]);
+    assert.equal(cmpExp.code, 0);
+    assert.match(cmpExp.out, /aligned by pivot/i);
+
+    // 4. pxl shot --vs <dir> and pxl shot --gif --vs <file|dir>
+    const f2 = join(dir, "b.px.js");
+    writeFileSync(f2, `pal({ k: "#111111", r: "#cc3333", g: "#33aa33", w: "#eeeeee" })
+sprite("s1", { w: 4, h: 4, pivot: [2, 4] }, rect(1, 1, 2, 3, "w"))
+anim("mv", { w: 4, h: 4, frames: 2, fps: 4 }, (c, fi) => c.px(fi, 1, "g"))`);
+    const vsDir = await run(["shot", f2, "s1", "--vs", out1, "--diff", "--scale", "1", "--out", join(dir, "vsdir.png")]);
+    assert.equal(vsDir.code, 0);
+    assert.match(vsDir.out, /changed/);
+    const vsGif = await run(["shot", f2, "mv", "--gif", "--vs", out1, "--scale", "1", "--out", join(dir, "vsgif.gif")]);
+    assert.equal(vsGif.code, 0);
+    assert.ok(existsSync(join(dir, "vsgif.gif")));
+    assert.ok(decodeGif(readFileSync(join(dir, "vsgif.gif"))).frames.length >= 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("Wave D 3D formats: .stl (ASCII, binary, VisCAM color, analyzeMesh, shot & study), 3DGS .ply (SH0-3, sdf.splats, cast shadows), Blender CLI (--dry + mocked exec)", async () => {
+  const { loadModel3d, analyzeMesh } = await import("../src/node/model3d.ts");
+  const { parsePlySplats } = await import("../src/core/files3d.ts");
+  const { blenderArgs, exportBlendToGlb, importGlbToBlend } = await import("../src/node/blender.ts");
+
+  const dir = mkdtempSync(join(tmpdir(), "pxl-wd-"));
+  const run = async (argv: string[]) => {
+    const out: string[] = [], logFn = console.log;
+    console.log = (s: string) => out.push(String(s));
+    try { const code = await main(argv); return { code, out: out.join("\n") }; } finally { console.log = logFn; }
+  };
+  try {
+    // 1. Build a watertight unit cube in Z-up (x: -0.5..0.5, y: -0.5..0.5, z: 0..1) as both ASCII and VisCAM colored binary STL
+    const cubeTris: [number[], number[], number[]][] = [
+      [[-0.5,-0.5,0],[0.5,0.5,0],[0.5,-0.5,0]], [[-0.5,-0.5,0],[-0.5,0.5,0],[0.5,0.5,0]], // bottom z=0
+      [[-0.5,-0.5,1],[0.5,-0.5,1],[0.5,0.5,1]], [[-0.5,-0.5,1],[0.5,0.5,1],[-0.5,0.5,1]], // top z=1
+      [[-0.5,-0.5,0],[0.5,-0.5,0],[0.5,-0.5,1]], [[-0.5,-0.5,0],[0.5,-0.5,1],[-0.5,-0.5,1]], // front y=-0.5
+      [[-0.5,0.5,0],[0.5,0.5,1],[0.5,0.5,0]], [[-0.5,0.5,0],[-0.5,0.5,1],[0.5,0.5,1]], // back y=0.5
+      [[-0.5,-0.5,0],[-0.5,-0.5,1],[-0.5,0.5,1]], [[-0.5,-0.5,0],[-0.5,0.5,1],[-0.5,0.5,0]], // left x=-0.5
+      [[0.5,-0.5,0],[0.5,0.5,1],[0.5,-0.5,1]], [[0.5,-0.5,0],[0.5,0.5,0],[0.5,0.5,1]], // right x=0.5
+    ];
+    const asciiLines = ["solid cube"];
+    for (const [a, b, c] of cubeTris) {
+      asciiLines.push(`  facet normal 0 0 1`, `    outer loop`, `      vertex ${a.join(" ")}`, `      vertex ${b.join(" ")}`, `      vertex ${c.join(" ")}`, `    endloop`, `  endfacet`);
+    }
+    asciiLines.push("endsolid cube");
+    const asciiStl = join(dir, "cube_ascii.stl");
+    writeFileSync(asciiStl, asciiLines.join("\n"));
+
+    const binBuf = Buffer.alloc(84 + cubeTris.length * 50);
+    binBuf.write("VisCAM binary stl test", 0, "ascii");
+    binBuf.writeUInt32LE(cubeTris.length, 80);
+    cubeTris.forEach(([a, b, c], ti) => {
+      const off = 84 + ti * 50;
+      const vs = [...a, ...b, ...c];
+      for (let i = 0; i < 9; i++) binBuf.writeFloatLE(vs[i], off + 12 + i * 4);
+      // VisCAM valid bit (0x8000) + pure red (r=31, g=0, b=0) in RGB555: (31 << 10) | 0x8000
+      binBuf.writeUInt16LE(0x8000 | (31 << 10), off + 48);
+    });
+    const binStl = join(dir, "cube_bin.stl");
+    writeFileSync(binStl, binBuf);
+
+    const mAscii = loadModel3d(asciiStl);
+    const mBin = loadModel3d(binStl);
+    assert.equal(mAscii.triangles, 12);
+    assert.equal(mBin.triangles, 12);
+    const mat0 = mBin.mats[mBin.matIds[0]];
+    assert.ok(mat0 && mat0.r > 240 && mat0.g < 10 && mat0.b < 10, `VisCAM 16-bit binary STL face color decoded (${JSON.stringify(mat0)})`);
+    const stats = analyzeMesh(mAscii);
+    assert.equal(stats.watertight, true, "unit cube STL is watertight");
+    assert.equal(stats.boundaryEdges, 0);
+    assert.ok(Math.abs(stats.volume - 1) < 1e-4, `unit cube volume ~1, got ${stats.volume}`);
+    assert.ok(stats.symmetry > 0.95, `symmetric cube L/R symmetry > 0.95, got ${stats.symmetry}`);
+
+    // pxl shot & pxl study on .stl
+    const stlShot = await run(["shot", binStl, "--dirs", "4", "--size", "48", "--out", join(dir, "stl.png")]);
+    assert.equal(stlShot.code, 0);
+    assert.ok(existsSync(join(dir, "stl.png")));
+    const stlStudy = await run(["study", binStl, "--no-out"]);
+    assert.equal(stlStudy.code, 0);
+    assert.match(stlStudy.out, /3D MODEL STUDY/);
+    assert.match(stlStudy.out, /watertight solid/);
+    assert.match(stlStudy.out, /HEIGHT PROFILE/);
+
+    // 2. 3DGS .ply (ASCII with SH degree 1 + binary LE) + sdf.splats("file.ply") + splats(..., { cast })
+    const asciiPly = [
+      "ply", "format ascii 1.0", "element vertex 2",
+      "property float x", "property float y", "property float z",
+      "property float f_dc_0", "property float f_dc_1", "property float f_dc_2",
+      "property float f_rest_0", "property float f_rest_1", "property float f_rest_2",
+      "property float f_rest_3", "property float f_rest_4", "property float f_rest_5",
+      "property float f_rest_6", "property float f_rest_7", "property float f_rest_8",
+      "property float opacity",
+      "property float scale_0", "property float scale_1", "property float scale_2",
+      "property float rot_0", "property float rot_1", "property float rot_2", "property float rot_3",
+      "end_header",
+      "0 0.5 0 1.5 -1.5 -1.5 0.5 0 0 0 0 0 0 0 0 3.0 -1.6 -1.6 -1.6 1 0 0 0",
+      "0.3 0.5 0 -1.5 1.5 -1.5 0 0 0 0 0 0 0 0 0 3.0 -1.6 -1.6 -1.6 1 0 0 0",
+    ].join("\n") + "\n";
+    const plyPath = join(dir, "cloud.ply");
+    writeFileSync(plyPath, asciiPly);
+    const spSet = parsePlySplats(readFileSync(plyPath));
+    assert.equal(spSet.n, 2);
+    assert.equal(spSet.shDeg, 1, "detects SH degree 1 from 9 f_rest coefficients");
+    assert.ok(spSet.shRest && spSet.shRest.length === 18);
+
+    const artPly = join(dir, "splat_art.px.js");
+    writeFileSync(artPly, `pal({ k: "#111111", r: "#cc3333", g: "#33aa33", w: "#eeeeee", s: "#444444" })
+ramps("krw", "kgw")
+const S = sdf.splats("cloud.ply")
+sprite("plain", { w: 32, h: 32, bg: "w" }, splats(S, { view: "side", ppm: 16, at: [16, 26] }))
+sprite("casted", { w: 32, h: 32, bg: "w" }, splats(S, { view: "side", ppm: 16, at: [16, 26], cast: "s" }))`);
+    const pSplat = loadProject(artPly);
+    const imPlain = pSplat.image("plain"), imCast = pSplat.image("casted");
+    const sCol = pSplat.pal.resolve("s")!;
+    assert.equal([...imPlain.data].filter((c) => c === sCol).length, 0);
+    assert.ok([...imCast.data].filter((c) => c === sCol).length > 2, "splats(..., { cast }) draws ground cast shadow");
+
+    // 3. Headless Blender bridge (--dry and mocked exec)
+    const fakeBlend = join(dir, "prop.blend"), fakeGlb = join(dir, "prop.glb");
+    writeFileSync(fakeBlend, "BLENDER-v300");
+    writeFileSync(fakeGlb, "glTF");
+    const args = blenderArgs("export", fakeBlend, fakeGlb, { pitch: 25, frame: 3, dirs: 5, size: 128 });
+    assert.ok(args.includes("--background") && args.includes("--python") && args.includes("--mode") && args.includes("export"));
+    const dryRes = await run(["blender", fakeBlend, "--dry"]);
+    assert.equal(dryRes.code, 0);
+    assert.match(dryRes.out, /--background.*--python.*blender_pxl\.py/);
+    const mockExport = exportBlendToGlb(fakeBlend, join(dir, "out.glb"), {
+      bin: "blender-mock",
+      exec: (_bin, a) => { const idx = a.indexOf("--out"); writeFileSync(a[idx + 1], "glTF-mock"); return { status: 0, stdout: "ok", stderr: "" }; },
+    });
+    assert.ok(existsSync(mockExport.out));
+    const mockImport = importGlbToBlend(fakeGlb, join(dir, "out.blend"), {
+      bin: "blender-mock",
+      exec: (_bin, a) => { const idx = a.indexOf("--out"); writeFileSync(a[idx + 1], "BLENDER-mock"); return { status: 0, stdout: "ok", stderr: "" }; },
+    });
+    assert.ok(existsSync(mockImport.out));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("Wave E CLI: pxl study --px 1 and frame-folder PNG sequence input", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-we-"));
+  const run = async (argv: string[]) => {
+    const out: string[] = [], logFn = console.log;
+    console.log = (s: string) => out.push(String(s));
+    try { const code = await main(argv); return { code, out: out.join("\n") }; } finally { console.log = logFn; }
+  };
+  try {
+    const seqDir = join(dir, "frames");
+    mkdirSync(seqDir);
+    for (let f = 0; f < 6; f++) {
+      const im = new Img(32, 24);
+      im.fill(pack(24, 28, 40));
+      for (let y = 8; y < 14; y++) for (let x = 2 + f * 4; x < 8 + f * 4; x++) im.set(x, y, pack(230, 80, 60));
+      writePng(join(seqDir, `frame_${f + 1}.png`), im);
+    }
+    const rFolder = await run(["study", seqDir, "--fps", "10", "--px", "1", "--no-out"]);
+    assert.equal(rFolder.code, 0);
+    assert.match(rFolder.out, /6 frames/);
+    assert.match(rFolder.out, /pixel art/);
+    assert.match(rFolder.out, /right at 4\.00 px\/frame/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

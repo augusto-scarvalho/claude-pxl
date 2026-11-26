@@ -26,10 +26,14 @@ type Node =
   | { op: "torus"; R: Num; r: Num }
   | { op: "plane"; n: Vec; h: Num }
   | { op: "ellipsoid"; r: Vec }
+  | { op: "lathe"; pts: readonly (readonly [Num, Num])[]; closed?: boolean }
+  | { op: "prism"; pts: readonly (readonly [Num, Num])[]; h: Num }
   | { op: "union" | "intersect"; of: Sdf[]; k: Num }
   | { op: "subtract"; of: [Sdf, Sdf]; k: Num }
   | { op: "at"; of: Sdf; v: Vec }
   | { op: "rotate"; of: Sdf; deg: Num; axis: Vec }
+  | { op: "orient"; of: Sdf; o: Vec; u: Vec; e?: Vec }
+  | { op: "grow"; of: Sdf; t: Num }
   | { op: "scale"; of: Sdf; s: Num | Vec }
   | { op: "twist"; of: Sdf; deg: Num }
   | { op: "bend"; of: Sdf; k: Num | Vec }
@@ -170,6 +174,12 @@ export class Sdf {
     if (!ax) throw new PxError(`sdf: rotate(deg, axis): axis is "x", "y", "z" or [x, y, z], got ${JSON.stringify(axis)}`);
     return new Sdf({ op: "rotate", of: this, deg, axis: ax });
   }
+  /** Placed in an orthonormal frame at `origin` with local +Z along `U` and local +X along orthogonalized `E` (optional; falls back cleanly if `E` is parallel to `U`). */
+  orient(origin: Vec, U: Vec, E?: Vec): Sdf {
+    return new Sdf({ op: "orient", of: this, o: origin, u: U, ...(E !== undefined ? { e: E } : {}) });
+  }
+  /** Signed distance offset: expands the surface outward by `t` (positive grows/inflates, negative erodes/shrinks). */
+  grow(t: Num): Sdf { return new Sdf({ op: "grow", of: this, t }); }
   /** Scaled about its origin: one factor, or [x, y, z] (distances then stay a bound, the march takes more steps). */
   scale(s: Num | Vec): Sdf { return new Sdf({ op: "scale", of: this, s }); }
   /** Twisted about the upright, `deg` degrees for each m up. */
@@ -401,6 +411,55 @@ function join(op: "union" | "intersect", a: unknown[]): Sdf {
   return of.length === 1 ? of[0] : new Sdf({ op, of, k });
 }
 
+/** Right-handed orthonormal basis `[X, Y, Z]` with `Z = unit(U)` and `X = unit(E - proj_Z(E))`, falling back cleanly if `E` is omitted or parallel to `U`. */
+export function orientBasis(uIn: readonly number[], eIn?: readonly number[]): [V3, V3, V3] {
+  const ul = Math.hypot(uIn[0], uIn[1], uIn[2]);
+  if (!(ul > 1e-9)) throw new PxError("sdf.orient: U axis cannot be [0, 0, 0]");
+  const Z: V3 = [uIn[0] / ul, uIn[1] / ul, uIn[2] / ul];
+  let ex = 0, ey = 0, ez = 0;
+  if (eIn !== undefined) {
+    const d = eIn[0] * Z[0] + eIn[1] * Z[1] + eIn[2] * Z[2];
+    ex = eIn[0] - Z[0] * d; ey = eIn[1] - Z[1] * d; ez = eIn[2] - Z[2] * d;
+  }
+  let el = Math.hypot(ex, ey, ez);
+  if (!(el > 1e-6)) {
+    const fb: V3 = Math.abs(Z[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+    const d = fb[0] * Z[0] + fb[1] * Z[1] + fb[2] * Z[2];
+    ex = fb[0] - Z[0] * d; ey = fb[1] - Z[1] * d; ez = fb[2] - Z[2] * d;
+    el = Math.hypot(ex, ey, ez);
+  }
+  const X: V3 = [ex / el, ey / el, ez / el];
+  const Y: V3 = [Z[1] * X[2] - Z[2] * X[1], Z[2] * X[0] - Z[0] * X[2], Z[0] * X[1] - Z[1] * X[0]];
+  return [X, Y, Z];
+}
+
+function evalPts2(pts: readonly (readonly [Num, Num])[], clock: Clock, what: string, minLen: number, nonNegX = false): [number, number][] {
+  if (!Array.isArray(pts) || pts.length < minLen) throw new PxError(`sdf.${what}: needs at least ${minLen} [u, v] points, got ${JSON.stringify(pts)?.slice(0, 80)}`);
+  return pts.map((p, i) => {
+    if (!Array.isArray(p) || p.length !== 2) throw new PxError(`sdf.${what}: point ${i} must be [a, b], got ${JSON.stringify(p)}`);
+    const a = num(p[0], clock, `${what}[${i}][0]`), b = num(p[1], clock, `${what}[${i}][1]`);
+    if (nonNegX && a < 0) throw new PxError(`sdf.${what}: radius at point ${i} must be >= 0, got ${a}`);
+    return [a, b];
+  });
+}
+
+/** Exact 2D polygon / open-lathe-profile signed distance codegen in `(u, v)`. */
+function emitPoly2D(c: Code, u: string, v: string, segs: [number, number, number, number][]): string {
+  const d2 = c.v("Infinity", true), s = c.v("1", true);
+  for (const [a0, b0, a1, b1] of segs) {
+    const ex = a1 - a0, ey = b1 - b0, ee = ex * ex + ey * ey;
+    if (!(ee > 1e-18)) continue;
+    const wx = c.v(`${u} - ${c.k(a0)}`), wy = c.v(`${v} - ${c.k(b0)}`);
+    const t = c.v(`Math.max(0, Math.min(1, (${wx} * ${c.k(ex)} + ${wy} * ${c.k(ey)}) * ${c.k(1 / ee)}))`);
+    const dx = c.v(`${wx} - ${c.k(ex)} * ${t}`), dy = c.v(`${wy} - ${c.k(ey)} * ${t}`);
+    c.line(`${d2} = Math.min(${d2}, ${dx} * ${dx} + ${dy} * ${dy});`);
+    if (Math.abs(ey) > 1e-12) {
+      c.line(`if ((${v} >= ${c.k(b0)}) !== (${v} >= ${c.k(b1)}) && ${u} < ${c.k(a0)} + (${v} - ${c.k(b0)}) * ${c.k(ex / ey)}) ${s} = -${s};`);
+    }
+  }
+  return c.v(`${s} * Math.sqrt(${d2})`);
+}
+
 /** The primitives and joins, as art files call them: sdf.sphere(r), sdf.union(a, b, { smooth }), ... */
 export const sdf = {
   /** A ball of radius r round the origin. */
@@ -417,6 +476,23 @@ export const sdf = {
   torus: (R: Num, r: Num) => new Sdf({ op: "torus", R, r }),
   /** Everything below a plane: its normal n (default up) and h m along it (sdf.plane() is the ground, z = 0). Endless: intersect it with something. */
   plane: (n: Vec = [0, 0, 1], h: Num = 0) => new Sdf({ op: "plane", n, h }),
+  /** Solid of revolution round the Z axis from `[radius, z]` profile points (automatically capped to axis unless closed loop or `{ closed: true }`). */
+  lathe: (pts: readonly (readonly [Num, Num])[], o: { closed?: boolean } = {}) => {
+    if (!Array.isArray(pts) || pts.length < 2) throw new PxError("sdf.lathe([[r, z], ...], { closed? }): needs at least 2 [radius, z] profile points");
+    if (o && typeof o === "object" && Object.keys(o).some((k) => k !== "closed")) throw new PxError(`sdf.lathe: unknown option ${Object.keys(o).filter((k) => k !== "closed").join(", ")}`);
+    return new Sdf({ op: "lathe", pts, ...(o?.closed ? { closed: true } : {}) });
+  },
+  /** Extruded 2D polygon `[[x, y], ...]` along Z centered at 0 (`[-depth/2, +depth/2]`). */
+  prism: (pts: readonly (readonly [Num, Num])[], depth: Num) => {
+    if (!Array.isArray(pts) || pts.length < 3) throw new PxError("sdf.prism([[x, y], ...], depth): needs at least 3 [x, y] polygon vertices");
+    return new Sdf({ op: "prism", pts, h: depth });
+  },
+  /** Place a field in an orthonormal frame at `origin` with local +Z along `U` and +X along `E`: accepts `(field, origin, U, E?)` or `(origin, U, E, field)`. */
+  orient: (a: Sdf | Vec, b: Vec, c: Vec, d?: Vec | Sdf): Sdf => {
+    if (a instanceof Sdf) return a.orient(b, c, d as Vec | undefined);
+    if (d instanceof Sdf) return d.orient(a, b, c);
+    throw new PxError("sdf.orient(field, origin, U, E?) or field.orient(origin, U, E?): requires a distance field");
+  },
   /** A field of the file's own: `d(x, y, z)` its distance (or less: never more), inside the box `lo`..`hi` (an axe's head cut to its outline). */
   field: (d: (x: number, y: number, z: number) => number, lo: number[], hi: number[]) => {
     if (typeof d !== "function" || ![lo, hi].every((v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite))) throw new PxError("sdf.field((x, y, z) => distance, [lo x, y, z], [hi x, y, z])");
@@ -443,7 +519,117 @@ const smin = (a: number, b: number, k: number) => { const h = Math.max(k - Math.
 // (inside, a lookup gives the material and the part as one number: (material + 1) + 1024 (part + 1), 0 none)
 const NONE: Fm = () => 0;
 const EMPTY_PART: Part = { m: NONE, lo: EMPTY_LO, hi: EMPTY_HI, lip: 1, e: (c) => c.v("Infinity") };
-const MOVES_ITSELF = new Set(["sphere", "box", "cylinder", "cone", "torus", "ellipsoid"]);
+const MOVES_ITSELF = new Set(["sphere", "box", "cylinder", "cone", "torus", "ellipsoid", "lathe", "prism"]);
+/**
+ * Extract half-space planes `n·x <= h` from an intersect's children and compute the exact tight AABB
+ * of the resulting convex polytope if the half-spaces enclose a bounded region (e.g. a hipped roof
+ * of 4 pitched planes + floor). Returns `undefined` if unbounded, `[EMPTY_LO, EMPTY_HI]` if empty.
+ */
+function polytopeBounds(children: Sdf[], boxes: [V3, V3][], clock: Clock): [V3, V3] | undefined {
+  const planes: [number, number, number, number][] = []; // [nx, ny, nz, h] representing n·x <= h
+  const addHalfSpace = (n: V3, h: number) => {
+    const l = Math.hypot(n[0], n[1], n[2]);
+    if (l > 1e-9) planes.push([n[0] / l, n[1] / l, n[2] / l, h / l]);
+  };
+  const collect = (s: Sdf): boolean => {
+    const n = s.node;
+    if (n.op === "plane") {
+      const v = vec(n.n, clock, "plane's normal"), h = num(n.h, clock, "plane's h");
+      addHalfSpace(v as V3, h);
+      return true;
+    }
+    if (n.op === "mat" || n.op === "paint" || n.op === "paintBy" || n.op === "part") return collect(n.of);
+    if (n.op === "when") return (typeof n.show === "function" ? !!(n.show as (c: Clock) => unknown)(clock) : n.show) ? collect(n.of) : false;
+    if (n.op === "at" && n.of.node.op === "plane") {
+      const p = n.of.node, v = vec(p.n, clock, "plane's normal"), l = Math.hypot(v[0], v[1], v[2]), h = num(p.h, clock, "plane's h");
+      const [ox, oy, oz] = vec(n.v, clock, "at's [x, y, z]");
+      if (l > 1e-9) { const nx = v[0] / l, ny = v[1] / l, nz = v[2] / l; planes.push([nx, ny, nz, h / l + nx * ox + ny * oy + nz * oz]); return true; }
+    }
+    if (n.op === "rotate" && n.of.node.op === "plane") {
+      const p = n.of.node, v = vec(p.n, clock, "plane's normal"), l = Math.hypot(v[0], v[1], v[2]), h = num(p.h, clock, "plane's h");
+      const ax = vec(n.axis, clock, "rotate's axis"), al = Math.hypot(ax[0], ax[1], ax[2]);
+      if (l > 1e-9 && al > 1e-9) {
+        const [u, vv, w] = ax.map((e) => e / al), g = (num(n.deg, clock, "rotate's deg") * Math.PI) / 180, co = Math.cos(g), si = Math.sin(g), t = 1 - co;
+        const M = [t * u * u + co, t * u * vv - si * w, t * u * w + si * vv, t * u * vv + si * w, t * vv * vv + co, t * vv * w - si * u, t * u * w - si * vv, t * vv * w + si * u, t * w * w + co];
+        const nx = v[0] / l, ny = v[1] / l, nz = v[2] / l;
+        planes.push([M[0] * nx + M[1] * ny + M[2] * nz, M[3] * nx + M[4] * ny + M[5] * nz, M[6] * nx + M[7] * ny + M[8] * nz, h / l]);
+        return true;
+      }
+    }
+    if (n.op === "orient" && n.of.node.op === "plane") {
+      const p = n.of.node, v = vec(p.n, clock, "plane's normal"), l = Math.hypot(v[0], v[1], v[2]), h = num(p.h, clock, "plane's h");
+      const o = vec(n.o, clock, "orient's origin"), u = vec(n.u, clock, "orient's U"), e = n.e !== undefined ? vec(n.e, clock, "orient's E") : undefined;
+      if (l > 1e-9) {
+        const [X, Y, Z] = orientBasis(u, e), lx = v[0] / l, ly = v[1] / l, lz = v[2] / l;
+        const nx = lx * X[0] + ly * Y[0] + lz * Z[0], ny = lx * X[1] + ly * Y[1] + lz * Z[1], nz = lx * X[2] + ly * Y[2] + lz * Z[2];
+        planes.push([nx, ny, nz, h / l + nx * o[0] + ny * o[1] + nz * o[2]]);
+        return true;
+      }
+    }
+    if (n.op === "intersect") return n.of.every(collect);
+    return false;
+  };
+  for (let i = 0; i < children.length; i++) {
+    collect(children[i]);
+    const [lo, hi] = boxes[i];
+    if (Number.isFinite(lo[0])) planes.push([-1, 0, 0, -lo[0]]);
+    if (Number.isFinite(hi[0])) planes.push([1, 0, 0, hi[0]]);
+    if (Number.isFinite(lo[1])) planes.push([0, -1, 0, -lo[1]]);
+    if (Number.isFinite(hi[1])) planes.push([0, 1, 0, hi[1]]);
+    if (Number.isFinite(lo[2])) planes.push([0, 0, -1, -lo[2]]);
+    if (Number.isFinite(hi[2])) planes.push([0, 0, 1, hi[2]]);
+  }
+  const m = planes.length;
+  if (m < 4 || m > 64) return undefined;
+  // Boundedness test in R^3: every extreme ray of a pointed polyhedron is ±(n_i x n_j).
+  // Bounded iff normals have rank 3 and no ray ±(n_i x n_j) satisfies n_k · d <= 0 for all k.
+  let hasTriplet = false;
+  for (let i = 0; i < m; i++) {
+    const a = planes[i];
+    for (let j = i + 1; j < m; j++) {
+      const b = planes[j];
+      const cx = a[1] * b[2] - a[2] * b[1], cy = a[2] * b[0] - a[0] * b[2], cz = a[0] * b[1] - a[1] * b[0];
+      const cl = Math.hypot(cx, cy, cz);
+      if (cl < 1e-8) continue;
+      let posRay = true, negRay = true;
+      for (let k = 0; k < m; k++) {
+        const d = planes[k][0] * cx + planes[k][1] * cy + planes[k][2] * cz;
+        if (d > 1e-7 * cl) posRay = false;
+        if (d < -1e-7 * cl) negRay = false;
+        if (!posRay && !negRay) break;
+      }
+      if (posRay || negRay) return undefined;
+    }
+  }
+  const verts: V3[] = [];
+  for (let i = 0; i < m; i++) {
+    const a = planes[i];
+    for (let j = i + 1; j < m; j++) {
+      const b = planes[j];
+      const bx = a[1] * b[2] - a[2] * b[1], by = a[2] * b[0] - a[0] * b[2], bz = a[0] * b[1] - a[1] * b[0];
+      for (let k = j + 1; k < m; k++) {
+        const c = planes[k];
+        const det = bx * c[0] + by * c[1] + bz * c[2];
+        if (Math.abs(det) < 1e-8) continue;
+        hasTriplet = true;
+        // Cramer's rule: p = (h_a (n_b x n_c) + h_b (n_c x n_a) + h_c (n_a x n_b)) / det
+        const bcx = b[1] * c[2] - b[2] * c[1], bcy = b[2] * c[0] - b[0] * c[2], bcz = b[0] * c[1] - b[1] * c[0];
+        const cax = c[1] * a[2] - c[2] * a[1], cay = c[2] * a[0] - c[0] * a[2], caz = c[0] * a[1] - c[1] * a[0];
+        const px = (a[3] * bcx + b[3] * cax + c[3] * bx) / det;
+        const py = (a[3] * bcy + b[3] * cay + c[3] * by) / det;
+        const pz = (a[3] * bcz + b[3] * caz + c[3] * bz) / det;
+        let ok = true;
+        for (let q = 0; q < m; q++) {
+          if (planes[q][0] * px + planes[q][1] * py + planes[q][2] * pz > planes[q][3] + 1e-5) { ok = false; break; }
+        }
+        if (ok) verts.push([px, py, pz]);
+      }
+    }
+  }
+  if (!hasTriplet) return undefined;
+  return verts.length ? boxOf(verts) : [EMPTY_LO, EMPTY_HI];
+}
+
 const corners = (lo: V3, hi: V3): V3[] => [0, 1, 2, 3, 4, 5, 6, 7].map((i) => [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]]);
 const boxOf = (pts: V3[]): [V3, V3] => [[0, 1, 2].map((e) => Math.min(...pts.map((p) => p[e]))) as V3, [0, 1, 2].map((e) => Math.max(...pts.map((p) => p[e]))) as V3];
 
@@ -550,16 +736,33 @@ export function boundsOf(f: Sdf, clock: Clock = STILL): [V3, V3] {
         return [lo, hi];
       }
       case "ellipsoid": { const [a, b, c] = vec(n.r, clock, "ellipsoid's r").map((v) => pos(v, "ellipsoid's r")); return shift([-a, -b, -c], [a, b, c]); }
+      case "lathe": {
+        const pts = evalPts2(n.pts, clock, "lathe", 2, true);
+        const R = Math.max(...pts.map((p) => p[0])), z0 = Math.min(...pts.map((p) => p[1])), z1 = Math.max(...pts.map((p) => p[1]));
+        return shift([-R, -R, z0], [R, R, z1]);
+      }
+      case "prism": {
+        const pts = evalPts2(n.pts, clock, "prism", 3, false), hh = pos(num(n.h, clock, "prism's depth"), "prism's depth") / 2;
+        const x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0])), y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
+        return shift([x0, y0, -hh], [x1, y1, hh]);
+      }
       case "union": case "intersect": {
         const raw = n.of.map((o) => go(o)), k = Math.max(0, num(n.k, clock, `${n.op}'s smooth`)), uni = n.op === "union";
         const ps = uni ? raw.filter(([lo, hi]) => !isEmpty(lo, hi)) : raw;
         if (uni) { if (!ps.length) return [EMPTY_LO, EMPTY_HI]; if (ps.length === 1) return ps[0]; }
         else if (ps.some(([lo, hi]) => isEmpty(lo, hi))) return [EMPTY_LO, EMPTY_HI];
         const grow = k / 4;
-        const lo: V3 = uni ? [Math.min(...ps.map((p) => p[0][0])) - grow, Math.min(...ps.map((p) => p[0][1])) - grow, Math.min(...ps.map((p) => p[0][2])) - grow]
+        let lo: V3 = uni ? [Math.min(...ps.map((p) => p[0][0])) - grow, Math.min(...ps.map((p) => p[0][1])) - grow, Math.min(...ps.map((p) => p[0][2])) - grow]
           : [Math.max(...ps.map((p) => p[0][0])), Math.max(...ps.map((p) => p[0][1])), Math.max(...ps.map((p) => p[0][2]))];
-        const hi: V3 = uni ? [Math.max(...ps.map((p) => p[1][0])) + grow, Math.max(...ps.map((p) => p[1][1])) + grow, Math.max(...ps.map((p) => p[1][2])) + grow]
+        let hi: V3 = uni ? [Math.max(...ps.map((p) => p[1][0])) + grow, Math.max(...ps.map((p) => p[1][1])) + grow, Math.max(...ps.map((p) => p[1][2])) + grow]
           : [Math.min(...ps.map((p) => p[1][0])), Math.min(...ps.map((p) => p[1][1])), Math.min(...ps.map((p) => p[1][2]))];
+        if (!uni && !Number.isFinite(lo[0] + lo[1] + lo[2] + hi[0] + hi[1] + hi[2])) {
+          const pb = polytopeBounds(n.of, ps, clock);
+          if (pb) {
+            lo = [Math.max(lo[0], pb[0][0]), Math.max(lo[1], pb[0][1]), Math.max(lo[2], pb[0][2])];
+            hi = [Math.min(hi[0], pb[1][0]), Math.min(hi[1], pb[1][1]), Math.min(hi[2], pb[1][2])];
+          }
+        }
         return !uni && isEmpty(lo, hi) ? [EMPTY_LO, EMPTY_HI] : [lo, hi];
       }
       case "subtract": {
@@ -581,6 +784,20 @@ export function boundsOf(f: Sdf, clock: Clock = STILL): [V3, V3] {
         return Number.isFinite(lo[0] + lo[1] + lo[2] + hi[0] + hi[1] + hi[2])
           ? boxOf(corners(lo, hi).map((p) => [M[0] * p[0] + M[1] * p[1] + M[2] * p[2], M[3] * p[0] + M[4] * p[1] + M[5] * p[2], M[6] * p[0] + M[7] * p[1] + M[8] * p[2]] as V3))
           : [[-INF, -INF, -INF], [INF, INF, INF]];
+      }
+      case "orient": {
+        const o = vec(n.o, clock, "orient's origin"), u = vec(n.u, clock, "orient's U"), e = n.e !== undefined ? vec(n.e, clock, "orient's E") : undefined;
+        const [X, Y, Z] = orientBasis(u, e), [lo, hi] = go(n.of);
+        if (isEmpty(lo, hi)) return [EMPTY_LO, EMPTY_HI];
+        return Number.isFinite(lo[0] + lo[1] + lo[2] + hi[0] + hi[1] + hi[2])
+          ? boxOf(corners(lo, hi).map((p) => [o[0] + p[0] * X[0] + p[1] * Y[0] + p[2] * Z[0], o[1] + p[0] * X[1] + p[1] * Y[1] + p[2] * Z[1], o[2] + p[0] * X[2] + p[1] * Y[2] + p[2] * Z[2]] as V3))
+          : [[-INF, -INF, -INF], [INF, INF, INF]];
+      }
+      case "grow": {
+        const t = num(n.t, clock, "grow's t"), [lo, hi] = go(n.of);
+        if (isEmpty(lo, hi)) return [EMPTY_LO, EMPTY_HI];
+        const nlo: V3 = [lo[0] - t, lo[1] - t, lo[2] - t], nhi: V3 = [hi[0] + t, hi[1] + t, hi[2] + t];
+        return isEmpty(nlo, nhi) ? [EMPTY_LO, EMPTY_HI] : [nlo, nhi];
       }
       case "scale": {
         const [sx, sy, sz] = vec(n.s, clock, "scale").map((v) => { if (!(v >= 0)) throw new PxError(`sdf: scale must be >= 0, got ${v}`); return v; });
@@ -753,6 +970,44 @@ function compiled(f: Sdf, clock: Clock): Compiled {
           },
         };
       }
+      case "lathe": {
+        const pts = evalPts2(n.pts, clock, "lathe", 2, true);
+        const R = Math.max(...pts.map((p) => p[0])), z0 = Math.min(...pts.map((p) => p[1])), z1 = Math.max(...pts.map((p) => p[1]));
+        const closed = !!n.closed || (pts.length >= 3 && Math.abs(pts[0][0] - pts[pts.length - 1][0]) < 1e-9 && Math.abs(pts[0][1] - pts[pts.length - 1][1]) < 1e-9);
+        const segs: [number, number, number, number][] = [];
+        if (closed) {
+          const end = Math.abs(pts[0][0] - pts[pts.length - 1][0]) < 1e-9 && Math.abs(pts[0][1] - pts[pts.length - 1][1]) < 1e-9 ? pts.length - 1 : pts.length;
+          for (let i = 0; i < end; i++) { const a = pts[i], b = pts[(i + 1) % end]; segs.push([a[0], a[1], b[0], b[1]]); }
+        } else {
+          if (pts[0][0] > 1e-9) segs.push([0, pts[0][1], pts[0][0], pts[0][1]]);
+          for (let i = 0; i < pts.length - 1; i++) segs.push([pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]]);
+          const last = pts[pts.length - 1];
+          if (last[0] > 1e-9) segs.push([last[0], last[1], 0, last[1]]);
+        }
+        const [lo, hi] = shift([-R, -R, z0], [R, R, z1]);
+        return {
+          m: NONE, lo, hi, lip: 1,
+          e: (c, x, y, z) => {
+            const X = c.v(`${x} - ${c.k(ox)}`), Y = c.v(`${y} - ${c.k(oy)}`), u = c.v(`Math.sqrt(${X} * ${X} + ${Y} * ${Y})`), v = c.v(`${z} - ${c.k(oz)}`);
+            return emitPoly2D(c, u, v, segs);
+          },
+        };
+      }
+      case "prism": {
+        const pts = evalPts2(n.pts, clock, "prism", 3, false), hh = pos(num(n.h, clock, "prism's depth"), "prism's depth") / 2;
+        const x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0])), y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
+        const segs: [number, number, number, number][] = [];
+        for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; segs.push([a[0], a[1], b[0], b[1]]); }
+        const [lo, hi] = shift([x0, y0, -hh], [x1, y1, hh]);
+        return {
+          m: NONE, lo, hi, lip: 1,
+          e: (c, x, y, z) => {
+            const X = c.v(`${x} - ${c.k(ox)}`), Y = c.v(`${y} - ${c.k(oy)}`), Z = c.v(`${z} - ${c.k(oz)}`);
+            const d2 = emitPoly2D(c, X, Y, segs), dz = c.v(`Math.abs(${Z}) - ${c.k(hh)}`);
+            return c.v(`Math.min(Math.max(${d2}, ${dz}), 0) + Math.hypot(Math.max(${d2}, 0), Math.max(${dz}, 0))`);
+          },
+        };
+      }
       case "union": case "intersect": {
         const rawPs = n.of.map((o) => go(o)), k = Math.max(0, num(n.k, clock, `${n.op}'s smooth`)), uni = n.op === "union";
         const ps = uni ? rawPs.filter((p) => !isEmpty(p.lo, p.hi)) : rawPs;
@@ -761,9 +1016,16 @@ function compiled(f: Sdf, clock: Clock): Compiled {
           if (ps.length === 1) return ps[0];
         } else if (ps.some((p) => isEmpty(p.lo, p.hi))) return EMPTY_PART;
         const lip = Math.max(...ps.map((p) => p.lip)), grow = k / 4;
-        const [lo, hi] = uni
+        let [lo, hi] = uni
           ? [[0, 1, 2].map((e) => Math.min(...ps.map((p) => p.lo[e])) - grow) as V3, [0, 1, 2].map((e) => Math.max(...ps.map((p) => p.hi[e])) + grow) as V3]
           : [[0, 1, 2].map((e) => Math.max(...ps.map((p) => p.lo[e]))) as V3, [0, 1, 2].map((e) => Math.min(...ps.map((p) => p.hi[e]))) as V3];
+        if (!uni && !Number.isFinite(lo[0] + lo[1] + lo[2] + hi[0] + hi[1] + hi[2])) {
+          const pb = polytopeBounds(n.of, ps.map((p) => [p.lo, p.hi]), clock);
+          if (pb) {
+            lo = [Math.max(lo[0], pb[0][0]), Math.max(lo[1], pb[0][1]), Math.max(lo[2], pb[0][2])];
+            hi = [Math.min(hi[0], pb[1][0]), Math.min(hi[1], pb[1][1]), Math.min(hi[2], pb[1][2])];
+          }
+        }
         if (!uni && isEmpty(lo, hi)) return EMPTY_PART;
         const N = ps.length, bx = new Float64Array(N * 7);
         ps.forEach((p, i) => bx.set([...p.lo, ...p.hi, p.lip], i * 7));
@@ -875,6 +1137,37 @@ function compiled(f: Sdf, clock: Clock): Compiled {
           lo, hi, lip: C.lip,
           e: (c, x, y, z) => { const m = M.map((v) => c.k(v)); return C.e(c, c.v(`${m[0]} * ${x} + ${m[3]} * ${y} + ${m[6]} * ${z}`), c.v(`${m[1]} * ${x} + ${m[4]} * ${y} + ${m[7]} * ${z}`), c.v(`${m[2]} * ${x} + ${m[5]} * ${y} + ${m[8]} * ${z}`)); },
         };
+      }
+      case "orient": {
+        const o = vec(n.o, clock, "orient's origin"), u = vec(n.u, clock, "orient's U"), e = n.e !== undefined ? vec(n.e, clock, "orient's E") : undefined, C = go(n.of);
+        const [X, Y, Z] = orientBasis(u, e);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
+        const [lo, hi] = Number.isFinite(C.lo[0] + C.lo[1] + C.lo[2] + C.hi[0] + C.hi[1] + C.hi[2])
+          ? boxOf(corners(C.lo, C.hi).map((p) => [o[0] + p[0] * X[0] + p[1] * Y[0] + p[2] * Z[0], o[1] + p[0] * X[1] + p[1] * Y[1] + p[2] * Z[1], o[2] + p[0] * X[2] + p[1] * Y[2] + p[2] * Z[2]] as V3))
+          : [[-INF, -INF, -INF] as V3, [INF, INF, INF] as V3];
+        return {
+          m: C.m === NONE ? NONE : (x, y, z, a, b, c) => {
+            const qx = x - o[0], qy = y - o[1], qz = z - o[2];
+            return C.m(qx * X[0] + qy * X[1] + qz * X[2], qx * Y[0] + qy * Y[1] + qz * Y[2], qx * Z[0] + qy * Z[1] + qz * Z[2],
+              a * X[0] + b * X[1] + c * X[2], a * Y[0] + b * Y[1] + c * Y[2], a * Z[0] + b * Z[1] + c * Z[2]);
+          },
+          lo, hi, lip: C.lip,
+          e: (c, x, y, z) => {
+            const qx = c.v(`${x} - ${c.k(o[0])}`), qy = c.v(`${y} - ${c.k(o[1])}`), qz = c.v(`${z} - ${c.k(o[2])}`);
+            return C.e(c,
+              c.v(`${qx} * ${c.k(X[0])} + ${qy} * ${c.k(X[1])} + ${qz} * ${c.k(X[2])}`),
+              c.v(`${qx} * ${c.k(Y[0])} + ${qy} * ${c.k(Y[1])} + ${qz} * ${c.k(Y[2])}`),
+              c.v(`${qx} * ${c.k(Z[0])} + ${qy} * ${c.k(Z[1])} + ${qz} * ${c.k(Z[2])}`),
+            );
+          },
+        };
+      }
+      case "grow": {
+        const t = num(n.t, clock, "grow's t"), C = go(n.of);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
+        const lo: V3 = [C.lo[0] - t, C.lo[1] - t, C.lo[2] - t], hi: V3 = [C.hi[0] + t, C.hi[1] + t, C.hi[2] + t];
+        if (isEmpty(lo, hi)) return EMPTY_PART;
+        return { m: C.m, lo, hi, lip: C.lip, e: (c, x, y, z) => c.v(`${C.e(c, x, y, z)} - ${c.k(t)}`) };
       }
       case "scale": {
         const [sx, sy, sz] = vec(n.s, clock, "scale").map((v) => { if (!(v >= 0)) throw new PxError(`sdf: scale must be >= 0, got ${v}`); return v; });

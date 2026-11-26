@@ -131,15 +131,17 @@ export interface Joints {
   grip?: [V3, V3];
   /** the pose's roll: these joints upright, as the parts are built on them; turned() gives them as drawn */
   roll?: number;
-  /** in a draw hook: a line of pixels from a to b in the figure's own depth (a held broom, a staff); `{ behind: true }` draws only where the figure has no opaque pixel */
-  rod?(a: V3, b: V3, paint: unknown, opts?: { behind?: boolean }): void;
-  /** in a draw hook: a 3D motion smear along a path of tip points `V3[]` or `[root, tip][]` segments, depth-tested against the figure (`{ behind: true }` only behind it) */
-  smear?(path: (V3 | [V3, V3])[], width: number | ((t: number) => number), paint: unknown, opts?: { behind?: boolean }): void;
+  /** in a draw hook: a line of pixels from a to b in the figure's own depth (a held broom, a staff); `{ behind: true }` draws only where the figure has no opaque pixel, `{ over: true }` draws unconditionally in front */
+  rod?(a: V3, b: V3, paint: unknown, opts?: { behind?: boolean; over?: boolean }): void;
+  /** in a draw hook: a 3D motion smear along a path of tip points `V3[]` or `[root, tip][]` segments, depth-tested against the figure (`{ behind: true }` only behind, `{ over: true }` unconditionally in front) */
+  smear?(path: (V3 | [V3, V3])[], width: number | ((t: number) => number), paint: unknown, opts?: { behind?: boolean; over?: boolean }): void;
   /** a limb along a bone, a ball turned with the body: pieces for parts() */
   limb(a: V3, b: V3, r0: number, r1?: number, paint?: unknown): Piece;
   ball(c: V3, r: number | number[], paint?: unknown): Piece;
   /** a surface swept round an upright through `base` from z0 up to z1 (a tunic, a cloak), see SweepOpts */
   sweep(base: V3, z0: number, z1: number, radius: (h: number, a: number) => number, o?: SweepOpts): Piece;
+  /** smoothly (or sharply) melt multiple pieces/fields into one field, optionally naming a sub-part */
+  union(pieces: (Piece | Sdf)[], opts?: { smooth?: number; part?: string }): Sdf;
   /** a hand-drawn decal pinned on the figure at `point` (a face's eyes), its other views by the angle; `on` the field it lies on (default the whole figure: an eye on the skull, not on the lock nearest) */
   decal(asset: string, point: V3, o?: { views?: { three?: string; profile?: string }; up?: V3; on?: Sdf; lit?: boolean; depth?: number }): DecalPiece;
   /** brushes scattered on a field (sdf.scatter's: tufts, strands), drawn on the figure before its line round */
@@ -287,6 +289,19 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
       if (!(field instanceof Sdf)) throw new PxError("scatter(field, opts): brushes scattered on a field (sdf.scatter's options)");
       return { scatter: { field, o } };
     },
+    union: (pieces, uo = {}) => {
+      if (!Array.isArray(pieces) || !pieces.length) throw new PxError("j.union(pieces, { smooth?, part? }): needs a non-empty array of pieces (j.limb, j.ball, j.sweep) or fields");
+      if (uo && typeof uo === "object") {
+        const bad = Object.keys(uo).filter((k) => k !== "smooth" && k !== "part");
+        if (bad.length) throw new PxError(`j.union: unknown option ${bad.join(", ")} (takes smooth, part)`);
+      }
+      const ramps = new Set<string>();
+      const fields = pieces.map((q) => pieceToField(q, ramps, "j.union"));
+      let f = sdf.union(fields, uo?.smooth !== undefined ? { smooth: uo.smooth } : {});
+      if (uo?.part !== undefined) f = f.part(uo.part);
+      if (ramps.size) UNION_RAMPS.set(f, [...ramps]);
+      return f;
+    },
   };
 }
 
@@ -386,10 +401,31 @@ export function solesOf(B: Body, headings: number[], pitch: number): Map<number,
   return out;
 }
 
+const UNION_RAMPS = new WeakMap<Sdf, string[]>();
+function pieceToField(q: unknown, ramps: Set<string>, where: string): Sdf {
+  if (q instanceof Sdf) {
+    const ur = UNION_RAMPS.get(q);
+    if (ur) for (const r of ur) ramps.add(r);
+    return q;
+  }
+  if (!isPiece(q)) throw new PxError(`rig3d: ${where} is a piece (j.limb, j.ball, j.sweep), a field (sdf.*) or a list of them, got ${JSON.stringify(q)?.slice(0, 80)}`);
+  const P = q.paint;
+  if (typeof P === "string") { ramps.add(P); return q.field.mat(P); }
+  if (typeof P !== "function") return q.field;
+  const at = q.at, pf = P as (h: number, a: number, o: boolean, n: V3) => unknown;
+  const paintFn = bare.pure && PURE.get(at) && PURE.get(pf)
+    ? bare.pure({ at, pf }, (p: V3, n: V3) => {
+        const [h, a, out] = at(p);
+        return pf(h, a, n[0] * out[0] + n[1] * out[1] + n[2] * out[2] >= 0, n);
+      })
+    : (p: V3, n: V3) => { const [h, a, out] = at(p); return pf(h, a, dot(n, out) >= 0, n); };
+  return q.field.paint(paintFn);
+}
+
 /**
  * What parts(j, pose) gives, as one field: { name: piece, field or a list of them }, each piece its
- * paint (a material, or (h, a, outside) => one: h along it, a round it, outside its face away from
- * its middle); the materials it names that are ramps of keys, for surface()'s mats.
+ * paint (a material, or (h, a, outside, normal) => one: h along it, a round it, outside its face away from
+ * its middle, normal its unit world normal); the materials it names that are ramps of keys, for surface()'s mats.
  */
 export function partsOf(spec: unknown, j: Joints): { field: Sdf; ramps: string[]; decals: (DecalPiece["decal"] & { part: string })[]; brushes: (ScatterPiece["scatter"] & { part: string })[] } {
   if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new PxError(`rig3d: parts(j, pose) gives { name: piece or [pieces] } (j.limb(a, b, r0, r1, paint), j.ball(c, r, paint), or a field), got ${JSON.stringify(spec)?.slice(0, 80)}`);
@@ -399,14 +435,7 @@ export function partsOf(spec: unknown, j: Joints): { field: Sdf; ramps: string[]
       if (q && typeof q === "object" && "decal" in q) { decals.push({ ...(q as DecalPiece).decal, part: name }); return false; }
       if (q && typeof q === "object" && "scatter" in q) { brushes.push({ ...(q as ScatterPiece).scatter, part: name }); return false; }
       return true;
-    }).map((q) => {
-      if (q instanceof Sdf) return q;
-      if (!isPiece(q)) throw new PxError(`rig3d: part '${name}' is a piece (j.limb, j.ball), a field (sdf.*) or a list of them, got ${JSON.stringify(q)?.slice(0, 80)}`);
-      const P = q.paint;
-      if (typeof P === "string") { ramps.add(P); return q.field.mat(P); }
-      if (typeof P !== "function") return q.field;
-      return q.field.paint((p, n) => { const [h, a, out] = q.at(p); return (P as (h: number, a: number, o: boolean) => unknown)(h, a, dot(n, out) >= 0); });
-    });
+    }).map((q) => pieceToField(q, ramps, `part '${name}'`));
     if (list.length) all.push(sdf.union(list).part(name));
   }
   if (!all.length) throw new PxError("rig3d: parts(j, pose) gave no parts");

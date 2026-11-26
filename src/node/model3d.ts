@@ -1,10 +1,10 @@
-// 3D reference models (.glb, .obj) rendered as orthographic turnarounds for `pxl shot`.
-// glTF 2.0 and Wavefront OBJ are right-handed Y-up (+Z toward the viewer); pxl's world is
-// right-handed Z-up (+Y away, +Z up), so each point comes in as (x, -z, y) — the exact inverse
-// of files3d.ts's yUp(), preserving triangle winding and normals.
+// 3D reference models (.glb, .obj, .stl) rendered as orthographic turnarounds for `pxl shot` & `pxl study`.
+// glTF 2.0 and Wavefront OBJ are right-handed Y-up (+Z toward the viewer); STL (3D printing / CAD)
+// defaults to right-handed Z-up (+Z up, +X right, +Y back), matching pxl's world directly.
+// Y-up sources convert via (x, -z, y) — the exact inverse of files3d.ts's yUp(), preserving winding.
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, extname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { pack } from "../core/color.ts";
 import { PxError } from "../core/errors.ts";
 import { glyph, lineWidth } from "../core/font.ts";
@@ -38,6 +38,27 @@ export interface Model3D {
   vertices: number;
   triangles: number;
   textures: number;
+  /** Source format info (e.g. "glb", "obj", "stl-binary", "stl-ascii"). */
+  format?: string;
+  /** Source up-axis used when loading ("y" or "z"). */
+  upAxis?: "y" | "z";
+}
+
+export interface LoadModelOpts {
+  /** Source up-axis override: "y" (default for .glb/.obj) or "z" (default for .stl). */
+  up?: "y" | "z";
+}
+
+export interface MeshStats {
+  watertight: boolean;
+  boundaryEdges: number;
+  nonManifoldEdges: number;
+  /** Signed volume in source cubic units (meaningful when watertight). */
+  volume: number;
+  /** Surface area in source square units. */
+  area: number;
+  /** Left-right symmetry score in [0, 1] across the bounding-box X midpoint. */
+  symmetry: number;
 }
 
 export interface TurnaroundOpts {
@@ -199,7 +220,8 @@ function readAccessor(json: GltfJson, buffers: Uint8Array[], index: number): Flo
 }
 
 /** Load a glTF 2.0 binary (.glb) file into pxl Z-up coordinates. */
-export function loadGlb(buf: Uint8Array): Model3D {
+export function loadGlb(buf: Uint8Array, opts: LoadModelOpts = {}): Model3D {
+  const up = opts.up ?? "y";
   if (buf.byteLength < 20) throw new PxError("not a .glb file (too short)");
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   if (dv.getUint32(0, true) !== 0x46546c67) throw new PxError("not a .glb file (bad magic header)");
@@ -317,8 +339,8 @@ export function loadGlb(buf: Uint8Array): Model3D {
         const wx = m[0] * x + m[4] * y + m[8] * z + m[12];
         const wy = m[1] * x + m[5] * y + m[9] * z + m[13];
         const wz = m[2] * x + m[6] * y + m[10] * z + m[14];
-        // Y-up -> pxl Z-up: (x, -z, y)
-        const px = wx, py = -wz, pz = wy;
+        // Convert to pxl Z-up (Y-up sources rotate via (x, -z, y); Z-up sources stay as-is)
+        const px = wx, py = up === "y" ? -wz : wy, pz = up === "y" ? wy : wz;
         vArr[i * 3] = px; vArr[i * 3 + 1] = py; vArr[i * 3 + 2] = pz;
         if (px < min[0]) min[0] = px; if (px > max[0]) max[0] = px;
         if (py < min[1]) min[1] = py; if (py > max[1]) max[1] = py;
@@ -330,7 +352,9 @@ export function loadGlb(buf: Uint8Array): Model3D {
           const tny = nmat[3] * nx + nmat[4] * ny + nmat[5] * nz;
           const tnz = nmat[6] * nx + nmat[7] * ny + nmat[8] * nz;
           const len = Math.hypot(tnx, tny, tnz) || 1;
-          nArr[i * 3] = tnx / len; nArr[i * 3 + 1] = -tnz / len; nArr[i * 3 + 2] = tny / len;
+          nArr[i * 3] = tnx / len;
+          nArr[i * 3 + 1] = (up === "y" ? -tnz : tny) / len;
+          nArr[i * 3 + 2] = (up === "y" ? tny : tnz) / len;
         }
         if (rawUv) {
           uArr[i * 2] = rawUv[i * 2]; uArr[i * 2 + 1] = rawUv[i * 2 + 1];
@@ -376,11 +400,12 @@ export function loadGlb(buf: Uint8Array): Model3D {
   }
 
   if (!totalTris) throw new PxError(".glb contains no triangle geometry");
-  return packModel(vertChunks, normChunks, uvChunks, triChunks, matChunks, mats, min, max, totalVerts, totalTris, hasUv, textures);
+  return { ...packModel(vertChunks, normChunks, uvChunks, triChunks, matChunks, mats, min, max, totalVerts, totalTris, hasUv, textures), format: "glb", upAxis: up };
 }
 
 /** Load a Wavefront .obj file (and optional sibling .mtl) into pxl Z-up coordinates. */
-export function loadObj(path: string): Model3D {
+export function loadObj(path: string, opts: LoadModelOpts = {}): Model3D {
+  const up = opts.up ?? "y";
   const text = readFileSync(path, "utf8");
   const pos: number[] = [], norm: number[] = [], uv: number[] = [];
   const mats: ModelMat[] = [{ r: 204, g: 204, b: 204 }];
@@ -426,14 +451,15 @@ export function loadObj(path: string): Model3D {
       const name = parts.slice(1).join(" ");
       curMat = matIndex.get(name) ?? 0;
     } else if (op === "v" && parts.length >= 4) {
-      // Y-up -> pxl Z-up: (x, -z, y)
-      const px = Number(parts[1]), py = -Number(parts[3]), pz = Number(parts[2]);
+      const vx = Number(parts[1]), vy = Number(parts[2]), vz = Number(parts[3]);
+      const px = vx, py = up === "y" ? -vz : vy, pz = up === "y" ? vy : vz;
       pos.push(px, py, pz);
       if (px < min[0]) min[0] = px; if (px > max[0]) max[0] = px;
       if (py < min[1]) min[1] = py; if (py > max[1]) max[1] = py;
       if (pz < min[2]) min[2] = pz; if (pz > max[2]) max[2] = pz;
     } else if (op === "vn" && parts.length >= 4) {
-      const nx = Number(parts[1]), ny = -Number(parts[3]), nz = Number(parts[2]);
+      const vx = Number(parts[1]), vy = Number(parts[2]), vz = Number(parts[3]);
+      const nx = vx, ny = up === "y" ? -vz : vy, nz = up === "y" ? vy : vz;
       const l = Math.hypot(nx, ny, nz) || 1;
       norm.push(nx / l, ny / l, nz / l);
     } else if (op === "vt" && parts.length >= 3) {
@@ -481,6 +507,138 @@ export function loadObj(path: string): Model3D {
     vertices: outV.length / 3,
     triangles: outT.length / 3,
     textures: 0,
+    format: "obj",
+    upAxis: up,
+  };
+}
+
+/**
+ * Load a Binary or ASCII `.stl` mesh (standard 3D-printing / CAD format) into pxl Z-up coordinates.
+ * Defaults to `up: "z"` (CAD / slicers / Blender STL export convention); pass `{ up: "y" }` for Y-up STLs.
+ * Supports VisCAM and Materialise Magics 16-bit per-triangle RGB colors in binary STLs.
+ */
+export function loadStl(buf: Uint8Array, opts: LoadModelOpts = {}): Model3D {
+  const up = opts.up ?? "z";
+  if (up !== "y" && up !== "z") throw new PxError(`loadStl: up must be "z" or "y", got ${JSON.stringify(opts.up)}`);
+  if (buf.byteLength < 15) throw new PxError("not an .stl file (too short)");
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  // Canonical binary check: 80-byte header + uint32 count + count * 50 bytes.
+  // (Must be checked before ASCII because some binary STLs start with "solid " in their header.)
+  const binTriCount = buf.byteLength >= 84 ? dv.getUint32(80, true) : -1;
+  const isBinary = buf.byteLength >= 84 && 84 + binTriCount * 50 === buf.byteLength;
+
+  const min: [number, number, number] = [Infinity, Infinity, Infinity];
+  const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  // Warm resin/clay default material so sculpted 3D-printing forms read with crisp shading.
+  const mats: ModelMat[] = [{ r: 214, g: 208, b: 200 }];
+  const colorMat = new Map<number, number>();
+  const xform = (x: number, y: number, z: number): [number, number, number] =>
+    up === "y" ? [x, -z, y] : [x, y, z];
+  const trackBound = (px: number, py: number, pz: number) => {
+    if (px < min[0]) min[0] = px; if (px > max[0]) max[0] = px;
+    if (py < min[1]) min[1] = py; if (py > max[1]) max[1] = py;
+    if (pz < min[2]) min[2] = pz; if (pz > max[2]) max[2] = pz;
+  };
+
+  if (isBinary) {
+    if (binTriCount === 0) throw new PxError(".stl contains no triangle geometry");
+    const headerStr = new TextDecoder().decode(buf.subarray(0, 80));
+    const isMaterialise = headerStr.includes("COLOR=");
+    const verts = new Float32Array(binTriCount * 9);
+    const norms = new Float32Array(binTriCount * 9);
+    const uvs = new Float32Array(binTriCount * 6);
+    const tris = new Uint32Array(binTriCount * 3);
+    const matIds = new Uint16Array(binTriCount);
+    for (let t = 0; t < binTriCount; t++) {
+      const o = 84 + t * 50;
+      const [fnx0, fny0, fnz0] = xform(dv.getFloat32(o, true), dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true));
+      const fnl = Math.hypot(fnx0, fny0, fnz0);
+      const fnx = fnl > 1e-6 ? fnx0 / fnl : 0, fny = fnl > 1e-6 ? fny0 / fnl : 0, fnz = fnl > 1e-6 ? fnz0 / fnl : 0;
+      for (let v = 0; v < 3; v++) {
+        const vo = o + 12 + v * 12;
+        const [px, py, pz] = xform(dv.getFloat32(vo, true), dv.getFloat32(vo + 4, true), dv.getFloat32(vo + 8, true));
+        const vi = t * 3 + v;
+        verts[vi * 3] = px; verts[vi * 3 + 1] = py; verts[vi * 3 + 2] = pz;
+        norms[vi * 3] = fnx; norms[vi * 3 + 1] = fny; norms[vi * 3 + 2] = fnz;
+        tris[vi] = vi;
+        trackBound(px, py, pz);
+      }
+      const attr = dv.getUint16(o + 48, true);
+      let mid = 0;
+      const hasColor = isMaterialise ? (attr & 0x8000) === 0 && attr !== 0 : (attr & 0x8000) !== 0;
+      if (hasColor) {
+        const key = attr & 0x7fff;
+        let found = colorMat.get(key);
+        if (found === undefined && mats.length < 65535) {
+          const r5 = isMaterialise ? (attr & 31) : ((attr >> 10) & 31);
+          const g5 = (attr >> 5) & 31;
+          const b5 = isMaterialise ? ((attr >> 10) & 31) : (attr & 31);
+          found = mats.length;
+          mats.push({ r: Math.round((r5 * 255) / 31), g: Math.round((g5 * 255) / 31), b: Math.round((b5 * 255) / 31) });
+          colorMat.set(key, found);
+        }
+        if (found !== undefined) mid = found;
+      }
+      matIds[t] = mid;
+    }
+    return {
+      verts, norms, uvs, hasUv: false, tris, matIds, mats, min, max,
+      vertices: binTriCount * 3, triangles: binTriCount, textures: 0,
+      format: "stl-binary", upAxis: up,
+    };
+  }
+
+  // ASCII STL parsing
+  const text = new TextDecoder().decode(buf);
+  if (!/^\s*solid\b/i.test(text) || !/\bfacet\s+normal\b/i.test(text))
+    throw new PxError("not a valid binary or ASCII .stl file");
+  const outV: number[] = [], outN: number[] = [];
+  let fnx = 0, fny = 0, fnz = 0;
+  const facetVerts: [number, number, number][] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const parts = line.split(/\s+/);
+    const op = parts[0].toLowerCase();
+    if (op === "facet" && parts[1]?.toLowerCase() === "normal" && parts.length >= 5) {
+      const [nx, ny, nz] = xform(Number(parts[2]), Number(parts[3]), Number(parts[4]));
+      const nl = Math.hypot(nx, ny, nz);
+      fnx = nl > 1e-6 ? nx / nl : 0; fny = nl > 1e-6 ? ny / nl : 0; fnz = nl > 1e-6 ? nz / nl : 0;
+      facetVerts.length = 0;
+    } else if (op === "vertex" && parts.length >= 4) {
+      const [px, py, pz] = xform(Number(parts[1]), Number(parts[2]), Number(parts[3]));
+      if (Number.isFinite(px) && Number.isFinite(py) && Number.isFinite(pz)) facetVerts.push([px, py, pz]);
+    } else if (op === "endfacet" && facetVerts.length >= 3) {
+      // Fan-triangulate in case a non-standard ASCII STL facet has >3 vertices
+      for (let k = 1; k + 1 < facetVerts.length; k++) {
+        for (const pt of [facetVerts[0], facetVerts[k], facetVerts[k + 1]]) {
+          outV.push(pt[0], pt[1], pt[2]);
+          outN.push(fnx, fny, fnz);
+          trackBound(pt[0], pt[1], pt[2]);
+        }
+      }
+      facetVerts.length = 0;
+    }
+  }
+  const vCount = outV.length / 3, tCount = Math.floor(vCount / 3);
+  if (!tCount) throw new PxError(".stl contains no triangle geometry");
+  const tris = new Uint32Array(tCount * 3);
+  for (let i = 0; i < tCount * 3; i++) tris[i] = i;
+  return {
+    verts: new Float32Array(outV),
+    norms: new Float32Array(outN),
+    uvs: new Float32Array(vCount * 2),
+    hasUv: false,
+    tris,
+    matIds: new Uint16Array(tCount),
+    mats,
+    min,
+    max,
+    vertices: vCount,
+    triangles: tCount,
+    textures: 0,
+    format: "stl-ascii",
+    upAxis: up,
   };
 }
 
@@ -512,12 +670,209 @@ function packModel(
   return { verts, norms, uvs, hasUv, tris, matIds, mats, min, max, vertices, triangles, textures };
 }
 
-/** Load a .glb or .obj 3D model from disk. */
-export function loadModel3d(path: string): Model3D {
+/** Load a .glb, .obj, or .stl 3D model from disk. */
+export function loadModel3d(path: string, opts: LoadModelOpts = {}): Model3D {
   const ext = extname(path).toLowerCase();
-  if (ext === ".glb") return loadGlb(readFileSync(path));
-  if (ext === ".obj") return loadObj(path);
-  throw new PxError(`unsupported 3D model format '${ext}' (expected .glb or .obj)`);
+  if (ext === ".glb") return loadGlb(readFileSync(path), opts);
+  if (ext === ".obj") return loadObj(path, opts);
+  if (ext === ".stl") return loadStl(readFileSync(path), opts);
+  throw new PxError(`unsupported 3D model format '${ext}' (expected .glb, .obj, or .stl)`);
+}
+
+/**
+ * Analyze mesh topology (watertightness, boundary/non-manifold edges, volume, surface area) and
+ * left-right silhouette symmetry across the bounding-box X midpoint.
+ */
+export function analyzeMesh(model: Model3D): MeshStats {
+  const { verts, tris, min, max, triangles } = model;
+  const dx = max[0] - min[0], dy = max[1] - min[1], dz = max[2] - min[2];
+  const diag = Math.hypot(dx, dy, dz) || 1;
+  // Quantize vertices to weld triangle-soup duplicates (like STL) cleanly
+  const qScale = 1e4 / diag;
+  const vKeyMap = new Map<string, number>();
+  let nextWeld = 0;
+  const weldOf = (vi: number): number => {
+    const x = Math.round((verts[vi * 3] - min[0]) * qScale);
+    const y = Math.round((verts[vi * 3 + 1] - min[1]) * qScale);
+    const z = Math.round((verts[vi * 3 + 2] - min[2]) * qScale);
+    const k = `${x},${y},${z}`;
+    let id = vKeyMap.get(k);
+    if (id === undefined) { id = nextWeld++; vKeyMap.set(k, id); }
+    return id;
+  };
+  const edgeCount = new Map<string, number>();
+  let vol6 = 0, area = 0;
+  const cx = (min[0] + max[0]) * 0.5, cy = (min[1] + max[1]) * 0.5, cz = (min[2] + max[2]) * 0.5;
+  for (let t = 0; t < triangles; t++) {
+    const i0 = tris[t * 3], i1 = tris[t * 3 + 1], i2 = tris[t * 3 + 2];
+    const ax = verts[i0 * 3] - cx, ay = verts[i0 * 3 + 1] - cy, az = verts[i0 * 3 + 2] - cz;
+    const bx = verts[i1 * 3] - cx, by = verts[i1 * 3 + 1] - cy, bz = verts[i1 * 3 + 2] - cz;
+    const cxv = verts[i2 * 3] - cx, cyv = verts[i2 * 3 + 1] - cy, czv = verts[i2 * 3 + 2] - cz;
+    const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
+    const e2x = cxv - ax, e2y = cyv - ay, e2z = czv - az;
+    const crx = e1y * e2z - e1z * e2y, cry = e1z * e2x - e1x * e2z, crz = e1x * e2y - e1y * e2x;
+    area += 0.5 * Math.hypot(crx, cry, crz);
+    vol6 += ax * (by * czv - bz * cyv) + ay * (bz * cxv - bx * czv) + az * (bx * cyv - by * cxv);
+    const w0 = weldOf(i0), w1 = weldOf(i1), w2 = weldOf(i2);
+    if (w0 === w1 || w1 === w2 || w2 === w0) continue;
+    for (const [u, v] of [[w0, w1], [w1, w2], [w2, w0]]) {
+      const k = u < v ? `${u}:${v}` : `${v}:${u}`;
+      edgeCount.set(k, (edgeCount.get(k) ?? 0) + 1);
+    }
+  }
+  let boundaryEdges = 0, nonManifoldEdges = 0;
+  for (const cnt of edgeCount.values()) {
+    if (cnt === 1) boundaryEdges++;
+    else if (cnt > 2) nonManifoldEdges++;
+  }
+  // Left-right symmetry via 3D voxel occupancy grid mirrored across X center
+  const G = 24;
+  const occ = new Uint8Array(G * G * G);
+  const invX = dx > 1e-9 ? (G - 1) / dx : 0, invY = dy > 1e-9 ? (G - 1) / dy : 0, invZ = dz > 1e-9 ? (G - 1) / dz : 0;
+  const mark = (px: number, py: number, pz: number) => {
+    const gx = Math.max(0, Math.min(G - 1, Math.round((px - min[0]) * invX)));
+    const gy = Math.max(0, Math.min(G - 1, Math.round((py - min[1]) * invY)));
+    const gz = Math.max(0, Math.min(G - 1, Math.round((pz - min[2]) * invZ)));
+    occ[(gz * G + gy) * G + gx] = 1;
+  };
+  for (let t = 0; t < triangles; t++) {
+    const i0 = tris[t * 3], i1 = tris[t * 3 + 1], i2 = tris[t * 3 + 2];
+    const x0 = verts[i0 * 3], y0 = verts[i0 * 3 + 1], z0 = verts[i0 * 3 + 2];
+    const x1 = verts[i1 * 3], y1 = verts[i1 * 3 + 1], z1 = verts[i1 * 3 + 2];
+    const x2 = verts[i2 * 3], y2 = verts[i2 * 3 + 1], z2 = verts[i2 * 3 + 2];
+    // Rasterize triangle surface onto the voxel grid so symmetry is invariant to diagonal triangulation
+    const e01 = Math.max(Math.abs(x1 - x0) * invX, Math.abs(y1 - y0) * invY, Math.abs(z1 - z0) * invZ);
+    const e02 = Math.max(Math.abs(x2 - x0) * invX, Math.abs(y2 - y0) * invY, Math.abs(z2 - z0) * invZ);
+    const e12 = Math.max(Math.abs(x2 - x1) * invX, Math.abs(y2 - y1) * invY, Math.abs(z2 - z1) * invZ);
+    const steps = Math.min(G, Math.max(1, Math.ceil(Math.max(e01, e02, e12) * 1.5)));
+    if (steps <= 1) {
+      mark(x0, y0, z0); mark(x1, y1, z1); mark(x2, y2, z2);
+      mark((x0 + x1 + x2) / 3, (y0 + y1 + y2) / 3, (z0 + z1 + z2) / 3);
+    } else {
+      for (let a = 0; a <= steps; a++) {
+        const u = a / steps;
+        for (let b = 0; b <= steps - a; b++) {
+          const v = b / steps, w = 1 - u - v;
+          mark(w * x0 + u * x1 + v * x2, w * y0 + u * y1 + v * y2, w * z0 + u * z1 + v * z2);
+        }
+      }
+    }
+  }
+  let filled = 0, matched = 0;
+  for (let gz = 0; gz < G; gz++) for (let gy = 0; gy < G; gy++) for (let gx = 0; gx < G; gx++) {
+    if (!occ[(gz * G + gy) * G + gx]) continue;
+    filled++;
+    const mx = G - 1 - gx;
+    if (occ[(gz * G + gy) * G + mx] || (mx > 0 && occ[(gz * G + gy) * G + mx - 1]) || (mx + 1 < G && occ[(gz * G + gy) * G + mx + 1])) matched++;
+  }
+  return {
+    watertight: boundaryEdges === 0 && nonManifoldEdges === 0 && edgeCount.size > 0,
+    boundaryEdges,
+    nonManifoldEdges,
+    volume: Math.abs(vol6) / 6,
+    area,
+    symmetry: filled ? matched / filled : 1,
+  };
+}
+
+export interface ModelStudyResult {
+  text: string[];
+  sheet: Img;
+  model: Model3D;
+  stats: MeshStats;
+  palette: number[];
+}
+
+/**
+ * Study a 3D model (.stl, .glb, .obj) for pixel-art translation: orthographic turnaround, proportions,
+ * 10-band height silhouette profile, mesh/print integrity, symmetry score, and suggested pxl scales.
+ */
+export function studyModel3d(path: string, opts: TurnaroundOpts & LoadModelOpts = {}): ModelStudyResult {
+  const model = loadModel3d(path, opts);
+  const stats = analyzeMesh(model);
+  const { img: sheet, labels, pitch, size } = renderModelTurnaround(model, {
+    pitch: opts.pitch ?? 20,
+    dirs: opts.dirs ?? 5,
+    size: opts.size ?? 160,
+  });
+  const dx = model.max[0] - model.min[0], dy = model.max[1] - model.min[1], dz = model.max[2] - model.min[2];
+  const cx = (model.min[0] + model.max[0]) * 0.5;
+  const fmt = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : "0.00");
+  const wh = dz > 1e-6 ? dx / dz : 0, dh = dz > 1e-6 ? dy / dz : 0, dw = dx > 1e-6 ? dy / dx : 0;
+
+  // 10 height-band cross-sections from 0% (base/feet) to 100% (top/crown)
+  const BANDS = 10;
+  const bx0 = new Float64Array(BANDS).fill(Infinity), bx1 = new Float64Array(BANDS).fill(-Infinity);
+  const by0 = new Float64Array(BANDS).fill(Infinity), by1 = new Float64Array(BANDS).fill(-Infinity);
+  const addPt = (px: number, py: number, pz: number) => {
+    const b = dz > 1e-9 ? Math.max(0, Math.min(BANDS - 1, Math.floor(((pz - model.min[2]) / dz) * BANDS))) : 0;
+    if (px < bx0[b]) bx0[b] = px; if (px > bx1[b]) bx1[b] = px;
+    if (py < by0[b]) by0[b] = py; if (py > by1[b]) by1[b] = py;
+  };
+  for (let t = 0; t < model.triangles; t++) {
+    const i0 = model.tris[t * 3], i1 = model.tris[t * 3 + 1], i2 = model.tris[t * 3 + 2];
+    const x0 = model.verts[i0 * 3], y0 = model.verts[i0 * 3 + 1], z0 = model.verts[i0 * 3 + 2];
+    const x1 = model.verts[i1 * 3], y1 = model.verts[i1 * 3 + 1], z1 = model.verts[i1 * 3 + 2];
+    const x2 = model.verts[i2 * 3], y2 = model.verts[i2 * 3 + 1], z2 = model.verts[i2 * 3 + 2];
+    addPt(x0, y0, z0); addPt(x1, y1, z1); addPt(x2, y2, z2);
+    // Sample triangle edges across every height band they span so tall flat faces fill all intermediate bands
+    for (const [ax, ay, az, bx, by, bz] of [[x0, y0, z0, x1, y1, z1], [x1, y1, z1, x2, y2, z2], [x2, y2, z2, x0, y0, z0]]) {
+      if (dz <= 1e-9 || Math.abs(bz - az) <= 1e-9) continue;
+      const bLo = Math.max(0, Math.min(BANDS - 1, Math.floor(((Math.min(az, bz) - model.min[2]) / dz) * BANDS)));
+      const bHi = Math.max(0, Math.min(BANDS - 1, Math.floor(((Math.max(az, bz) - model.min[2]) / dz) * BANDS)));
+      for (let b = bLo; b <= bHi; b++) {
+        const zMid = model.min[2] + ((b + 0.5) / BANDS) * dz;
+        const u = (zMid - az) / (bz - az);
+        if (u >= 0 && u <= 1) addPt(ax + u * (bx - ax), ay + u * (by - ay), zMid);
+      }
+    }
+  }
+  const BAR_W = 24;
+  const profileLines: string[] = [];
+  for (let b = BANDS - 1; b >= 0; b--) {
+    const pct = `${String(b * 10).padStart(2)}-${String((b + 1) * 10).padStart(3)}%`;
+    if (bx0[b] > bx1[b]) { profileLines.push(`  ${pct}  (empty)`); continue; }
+    const bw = bx1[b] - bx0[b], bd = by1[b] - by0[b], bmid = (bx0[b] + bx1[b]) * 0.5;
+    const lIdx = dx > 1e-9 ? Math.max(0, Math.min(BAR_W - 1, Math.floor(((bx0[b] - model.min[0]) / dx) * BAR_W))) : 0;
+    const rIdx = dx > 1e-9 ? Math.max(lIdx, Math.min(BAR_W - 1, Math.ceil(((bx1[b] - model.min[0]) / dx) * BAR_W) - 1)) : BAR_W - 1;
+    let bar = "";
+    for (let k = 0; k < BAR_W; k++) bar += k >= lIdx && k <= rIdx ? "#" : ".";
+    const lean = dz > 1e-9 ? (bmid - cx) / dz : 0;
+    const leanStr = Math.abs(lean) >= 0.04 ? ` lean ${lean > 0 ? "+" : ""}${fmt(lean)}H` : "";
+    profileLines.push(`  ${pct}  [${bar}]  W=${fmt(dz ? bw / dz : 0)}H  D=${fmt(dz ? bd / dz : 0)}H${leanStr}`);
+  }
+
+  const symPct = Math.round(stats.symmetry * 100);
+  const symNote = symPct >= 88
+    ? `symmetric (${symPct}% — mirror: "auto" / mirrored E from W fits)`
+    : symPct >= 70
+    ? `mostly symmetric (${symPct}% — minor asymmetric gear/pose)`
+    : `asymmetric (${symPct}% — use distinct left/right parts or headings)`;
+  const meshIntegrity = stats.watertight
+    ? `watertight solid (0 open edges, vol ${stats.volume.toFixed(2)}, area ${stats.area.toFixed(2)})`
+    : `open/non-manifold (${stats.boundaryEdges} boundary, ${stats.nonManifoldEdges} non-manifold edges; area ${stats.area.toFixed(2)})`;
+  const unitHint = model.format?.startsWith("stl")
+    ? (Math.max(dx, dy, dz) > 10 ? " (STL has no units; values look like mm — e.g. 3D-print scale)" : " (STL has no units; values look like meters/cm)")
+    : "";
+  const scales = [24, 32, 48, 64].map((h) => `${Math.max(8, Math.round(h * wh))}x${h}px (D~${Math.max(6, Math.round(h * dh))}px)`);
+  const palette = [...new Set(model.mats.map((m) => pack(m.r, m.g, m.b)))];
+
+  const text = [
+    `3D MODEL STUDY: ${basename(path)} (${model.format ?? extname(path).slice(1)}, ${model.upAxis ?? "z"}-up)`,
+    `  geometry: ${model.vertices.toLocaleString()} vertices, ${model.triangles.toLocaleString()} triangles, ${model.mats.length} material${model.mats.length === 1 ? "" : "s"}${model.textures ? ` (${model.textures} textured)` : ""}`,
+    `  mesh: ${meshIntegrity}`,
+    `  bounds (W x D x H): ${fmt(dx)} x ${fmt(dy)} x ${fmt(dz)}${unitHint}`,
+    `  ratios: W/H=${fmt(wh)}, D/H=${fmt(dh)}, D/W=${fmt(dw)}`,
+    `  symmetry: ${symNote}`,
+    "",
+    "HEIGHT PROFILE (top 100% down to base 0%; widths & depths as fraction of total height H):",
+    ...profileLines,
+    "",
+    "PXL PIXEL-ART TARGETS:",
+    `  sprite boxes at 24 / 32 / 48 / 64px tall: ${scales.join("  |  ")}`,
+    `  turnaround: ${labels.join(", ")} at pitch ${pitch} deg (${size}px cells); pass --up ${model.upAxis === "z" ? "y" : "z"} if the model is tipped on its side`,
+  ];
+  return { text, sheet, model, stats, palette };
 }
 
 /** Render an orthographic multi-angle turnaround sheet of a 3D model matching pxl's camera and heading conventions. */

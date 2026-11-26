@@ -8,7 +8,7 @@
      the only part of pxl that needs the network. Rebuilt files reload on their own. -->
 <style>
   html, body { margin: 0; height: 100%; background: #15131c; color: #e8e4f0; font: 13px system-ui, sans-serif; overflow: hidden; }
-  #bar { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: #1d1a27; border-bottom: 1px solid #322d40; }
+  #bar { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: #1d1a27; border-bottom: 1px solid #322d40; z-index: 1; }
   #bar b { font: 700 14px ui-monospace, Consolas, monospace; color: #ffb454; }
   select { background: #15131c; color: #e8e4f0; border: 1px solid #322d40; border-radius: 6px; padding: 3px 6px; }
   #info { color: #9a93ab; font: 12px ui-monospace, Consolas, monospace; }
@@ -19,12 +19,11 @@
 </script>
 </head>
 <body>
-<div id="bar"><b>pxl 3D</b><select id="pick"></select><span id="info">drag to turn, scroll to zoom, right-drag to move</span></div>
+<div id="bar"><b>pxl 3D</b><select id="pick"></select><select id="mode" hidden><option value="splats">Splats</option><option value="points">Points</option></select><span id="info">drag to turn, scroll to zoom, right-drag to move</span></div>
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { PLYLoader } from "three/addons/loaders/PLYLoader.js";
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 document.body.append(renderer.domElement);
@@ -35,52 +34,259 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.6);
 sun.position.set(-3, 5, 4);
 scene.add(sun);
 const pick = document.getElementById("pick");
-let current, mixer, framed = "";
-// drawn when the model or the view changes, in a loop only while a model animates: an open tab
-// doesn't keep the graphics card busy redrawing a still picture
-const draw = () => renderer.render(scene, camera);
+const modeEl = document.getElementById("mode");
+const infoEl = document.getElementById("info");
+let current, mixer, framed = "", splatState = null, lastSortDir = new THREE.Vector3();
+
+// Parse binary little-endian or ASCII 3DGS .ply into typed arrays (positions, colors, opacity, 3D covariance).
+function parse3dgsPly(buf) {
+  const u8 = new Uint8Array(buf);
+  const headText = new TextDecoder().decode(u8.subarray(0, Math.min(u8.length, 16384)));
+  const mEnd = /\r?\nend_header\r?\n/.exec(headText);
+  if (!mEnd) throw new Error("invalid .ply header");
+  const lines = headText.slice(0, mEnd.index).split(/\r?\n/);
+  const bodyStart = new TextEncoder().encode(headText.slice(0, mEnd.index + mEnd[0].length)).length;
+  const sizes = { char: 1, int8: 1, uchar: 1, uint8: 1, short: 2, int16: 2, ushort: 2, uint16: 2, int: 4, int32: 4, uint: 4, uint32: 4, float: 4, float32: 4, double: 8, float64: 8 };
+  let format = "", count = 0, inV = false, off = 0;
+  const props = [];
+  for (const raw of lines) {
+    const l = raw.trim();
+    const p = l.split(/\s+/);
+    if (p[0] === "format") format = p[1];
+    else if (p[0] === "element") { inV = p[1] === "vertex"; if (inV) count = parseInt(p[2], 10); }
+    else if (p[0] === "property" && inV) { const sz = sizes[p[1]] || 4; props.push({ name: p[2], type: p[1], off }); off += sz; }
+  }
+  const idx = new Map(props.map((p, i) => [p.name, i]));
+  let get;
+  if (format === "binary_little_endian") {
+    const dv = new DataView(buf), stride = off;
+    get = (i, k) => {
+      const p = props[k], at = bodyStart + i * stride + p.off;
+      if (p.type === "float" || p.type === "float32") return dv.getFloat32(at, true);
+      if (p.type === "double" || p.type === "float64") return dv.getFloat64(at, true);
+      if (p.type === "uchar" || p.type === "uint8") return dv.getUint8(at);
+      return dv.getInt32(at, true);
+    };
+  } else {
+    const rows = new TextDecoder().decode(u8.subarray(bodyStart)).trim().split(/\r?\n/).map((r) => r.trim().split(/\s+/).map(Number));
+    get = (i, k) => rows[i]?.[k] ?? 0;
+  }
+  const ix = idx.get("x"), iy = idx.get("y"), iz = idx.get("z");
+  const dc0 = idx.get("f_dc_0"), dc1 = idx.get("f_dc_1"), dc2 = idx.get("f_dc_2");
+  const rr = idx.get("red"), gg = idx.get("green"), bb = idx.get("blue");
+  const io = idx.get("opacity");
+  const s0 = idx.get("scale_0"), s1 = idx.get("scale_1"), s2 = idx.get("scale_2");
+  const r0 = idx.get("rot_0"), r1 = idx.get("rot_1"), r2 = idx.get("rot_2"), r3 = idx.get("rot_3");
+  const pos = new Float32Array(count * 3), col = new Float32Array(count * 3), opa = new Float32Array(count);
+  const covA = new Float32Array(count * 3), covB = new Float32Array(count * 3);
+  const C0 = 0.28209479177387814;
+  for (let i = 0; i < count; i++) {
+    pos[i * 3] = get(i, ix); pos[i * 3 + 1] = get(i, iy); pos[i * 3 + 2] = get(i, iz);
+    if (dc0 !== undefined) {
+      col[i * 3] = Math.min(1, Math.max(0, 0.5 + C0 * get(i, dc0)));
+      col[i * 3 + 1] = Math.min(1, Math.max(0, 0.5 + C0 * get(i, dc1)));
+      col[i * 3 + 2] = Math.min(1, Math.max(0, 0.5 + C0 * get(i, dc2)));
+    } else if (rr !== undefined) {
+      const div = props[rr].type === "uchar" ? 255 : 1;
+      col[i * 3] = get(i, rr) / div; col[i * 3 + 1] = get(i, gg) / div; col[i * 3 + 2] = get(i, bb) / div;
+    } else { col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = 0.8; }
+    opa[i] = io !== undefined ? 1 / (1 + Math.exp(-get(i, io))) : 0.95;
+    const sx = s0 !== undefined ? Math.exp(get(i, s0)) : 0.02;
+    const sy = s1 !== undefined ? Math.exp(get(i, s1)) : sx;
+    const sz = s2 !== undefined ? Math.exp(get(i, s2)) : sx;
+    let rw = r0 !== undefined ? get(i, r0) : 1, rx = r1 !== undefined ? get(i, r1) : 0, ry = r2 !== undefined ? get(i, r2) : 0, rz = r3 !== undefined ? get(i, r3) : 0;
+    const rl = Math.hypot(rw, rx, ry, rz) || 1;
+    rw /= rl; rx /= rl; ry /= rl; rz /= rl;
+    // Rotation matrix * diag(s) -> 3D covariance Sigma = M * M^T (symmetric 6 floats)
+    const m00 = (1 - 2 * (ry * ry + rz * rz)) * sx, m01 = 2 * (rx * ry - rw * rz) * sy, m02 = 2 * (rx * rz + rw * ry) * sz;
+    const m10 = 2 * (rx * ry + rw * rz) * sx, m11 = (1 - 2 * (rx * rx + rz * rz)) * sy, m12 = 2 * (ry * rz - rw * rx) * sz;
+    const m20 = 2 * (rx * rz - rw * ry) * sx, m21 = 2 * (ry * rz + rw * rx) * sy, m22 = (1 - 2 * (rx * rx + ry * ry)) * sz;
+    covA[i * 3] = m00 * m00 + m01 * m01 + m02 * m02;
+    covA[i * 3 + 1] = m00 * m10 + m01 * m11 + m02 * m12;
+    covA[i * 3 + 2] = m00 * m20 + m01 * m21 + m02 * m22;
+    covB[i * 3] = m10 * m10 + m11 * m11 + m12 * m12;
+    covB[i * 3 + 1] = m10 * m20 + m11 * m21 + m12 * m22;
+    covB[i * 3 + 2] = m20 * m20 + m21 * m21 + m22 * m22;
+  }
+  return { count, pos, col, opa, covA, covB };
+}
+
+function buildSplatMesh(data) {
+  const n = data.count;
+  const quad = new THREE.InstancedBufferGeometry();
+  quad.setAttribute("position", new THREE.BufferAttribute(new Float32Array([-2, -2, 0, 2, -2, 0, -2, 2, 0, 2, 2, 0]), 3));
+  quad.setIndex([0, 1, 2, 2, 1, 3]);
+  const iCenter = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+  const iColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+  const iAlpha = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+  const iCovA = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+  const iCovB = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+  quad.setAttribute("aCenter", iCenter);
+  quad.setAttribute("aColor", iColor);
+  quad.setAttribute("aAlpha", iAlpha);
+  quad.setAttribute("aCovA", iCovA);
+  quad.setAttribute("aCovB", iCovB);
+  quad.instanceCount = n;
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.NormalBlending,
+    uniforms: { uViewport: { value: new THREE.Vector2(innerWidth, innerHeight) } },
+    vertexShader: `
+      attribute vec3 aCenter, aColor, aCovA, aCovB;
+      attribute float aAlpha;
+      uniform vec2 uViewport;
+      varying vec3 vColor;
+      varying float vAlpha;
+      varying vec2 vCoord;
+      void main() {
+        vec4 cam = modelViewMatrix * vec4(aCenter, 1.0);
+        if (cam.z > -0.01) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }
+        vec4 clip = projectionMatrix * cam;
+        vec2 focal = vec2(projectionMatrix[0][0], projectionMatrix[1][1]) * uViewport * 0.5;
+        float invZ = 1.0 / (-cam.z);
+        mat3 Vrk = mat3(aCovA.x, aCovA.y, aCovA.z, aCovA.y, aCovB.x, aCovB.y, aCovA.z, aCovB.y, aCovB.z);
+        mat3 W = mat3(modelViewMatrix);
+        mat3 T = mat3(
+          focal.x * invZ, 0.0, 0.0,
+          0.0, focal.y * invZ, 0.0,
+          -focal.x * cam.x * invZ * invZ, -focal.y * cam.y * invZ * invZ, 0.0
+        ) * W;
+        mat3 cov = T * Vrk * transpose(T);
+        float a = cov[0][0] + 0.35, b = cov[0][1], d = cov[1][1] + 0.35;
+        float mid = 0.5 * (a + d);
+        float rad = sqrt(max(0.01, (a - d) * (a - d) * 0.25 + b * b));
+        float l1 = max(0.1, mid + rad), l2 = max(0.1, mid - rad);
+        vec2 eig1 = normalize(vec2(b, l1 - a));
+        if (length(vec2(b, l1 - a)) < 1e-6) eig1 = vec2(1.0, 0.0);
+        vec2 eig2 = vec2(-eig1.y, eig1.x);
+        vec2 axis1 = eig1 * min(sqrt(l1) * 1.4, 240.0);
+        vec2 axis2 = eig2 * min(sqrt(l2) * 1.4, 240.0);
+        vec2 ndcOff = (position.x * axis1 + position.y * axis2) / (uViewport * 0.5);
+        gl_Position = vec4(clip.xy / clip.w + ndcOff, clip.z / clip.w, 1.0);
+        vColor = aColor;
+        vAlpha = aAlpha;
+        vCoord = position.xy;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vColor;
+      varying float vAlpha;
+      varying vec2 vCoord;
+      void main() {
+        float r2 = dot(vCoord, vCoord);
+        if (r2 > 4.0) discard;
+        float a = vAlpha * exp(-0.5 * r2);
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(vColor, a);
+      }
+    `,
+  });
+  const mesh = new THREE.Mesh(quad, mat);
+  mesh.frustumCulled = false;
+  const order = new Int32Array(n), depths = new Float32Array(n);
+  const sortForCamera = () => {
+    const m = camera.matrixWorldInverse.elements;
+    const fx = m[2], fy = m[6], fz = m[10];
+    for (let i = 0; i < n; i++) {
+      order[i] = i;
+      depths[i] = data.pos[i * 3] * fx + data.pos[i * 3 + 1] * fy + data.pos[i * 3 + 2] * fz;
+    }
+    order.sort((a, b) => depths[a] - depths[b]); // back-to-front (smaller view z is farther)
+    const cArr = iCenter.array, colArr = iColor.array, aArr = iAlpha.array, caArr = iCovA.array, cbArr = iCovB.array;
+    for (let k = 0; k < n; k++) {
+      const i = order[k];
+      cArr[k * 3] = data.pos[i * 3]; cArr[k * 3 + 1] = data.pos[i * 3 + 1]; cArr[k * 3 + 2] = data.pos[i * 3 + 2];
+      colArr[k * 3] = data.col[i * 3]; colArr[k * 3 + 1] = data.col[i * 3 + 1]; colArr[k * 3 + 2] = data.col[i * 3 + 2];
+      aArr[k] = data.opa[i];
+      caArr[k * 3] = data.covA[i * 3]; caArr[k * 3 + 1] = data.covA[i * 3 + 1]; caArr[k * 3 + 2] = data.covA[i * 3 + 2];
+      cbArr[k * 3] = data.covB[i * 3]; cbArr[k * 3 + 1] = data.covB[i * 3 + 1]; cbArr[k * 3 + 2] = data.covB[i * 3 + 2];
+    }
+    iCenter.needsUpdate = iColor.needsUpdate = iAlpha.needsUpdate = iCovA.needsUpdate = iCovB.needsUpdate = true;
+  };
+  const gPts = new THREE.BufferGeometry();
+  gPts.setAttribute("position", new THREE.BufferAttribute(data.pos, 3));
+  gPts.setAttribute("color", new THREE.BufferAttribute(data.col.map((v) => v ** 2.2), 3));
+  gPts.computeBoundingSphere();
+  const points = new THREE.Points(gPts, new THREE.PointsMaterial({ size: Math.max(0.01, (gPts.boundingSphere?.radius || 1) / 60), vertexColors: true }));
+  const box = new THREE.Box3().setFromBufferAttribute(gPts.getAttribute("position"));
+  return { mesh, points, mat, sortForCamera, box, count: n };
+}
+
+// drawn when the model or the view changes, in a loop only while a model animates
+const draw = () => {
+  if (splatState && modeEl.value === "splats") {
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    if (dir.distanceToSquared(lastSortDir) > 1e-4) {
+      lastSortDir.copy(dir);
+      splatState.sortForCamera();
+    }
+  }
+  renderer.render(scene, camera);
+};
 controls.addEventListener("change", draw);
 
 async function show(file, keepView) {
   const url = "/files/" + encodeURIComponent(file) + "?v=" + Date.now();
-  let obj;
+  let obj, box;
   mixer = undefined;
+  splatState = null;
   if (file.endsWith(".ply")) {
-    // splats as points, each its color from 3DGS's zeroth harmonic
-    const loader = new PLYLoader();
-    loader.setCustomPropertyNameMapping({ dc: ["f_dc_0", "f_dc_1", "f_dc_2"] });
-    const g = await loader.loadAsync(url), dc = g.getAttribute("dc");
-    if (dc) g.setAttribute("color", new THREE.BufferAttribute(dc.array.map((v) => Math.min(1, Math.max(0, 0.5 + 0.28209479 * v)) ** 2.2), 3));
-    g.computeBoundingSphere();
-    obj = new THREE.Points(g, new THREE.PointsMaterial({ size: g.boundingSphere.radius / 60, vertexColors: true }));
+    const buf = await (await fetch(url)).arrayBuffer();
+    splatState = buildSplatMesh(parse3dgsPly(buf));
+    modeEl.hidden = false;
+    splatState.mat.uniforms.uViewport.value.set(innerWidth, innerHeight);
+    obj = modeEl.value === "points" ? splatState.points : splatState.mesh;
+    box = splatState.box;
+    infoEl.textContent = `${splatState.count.toLocaleString()} splats · drag to turn, scroll to zoom`;
   } else {
+    modeEl.hidden = true;
     const gltf = await new GLTFLoader().loadAsync(url);
     obj = gltf.scene;
+    box = new THREE.Box3().setFromObject(obj);
     if (gltf.animations.length) { mixer = new THREE.AnimationMixer(obj); for (const c of gltf.animations) mixer.clipAction(c).play(); }
+    infoEl.textContent = "drag to turn, scroll to zoom, right-drag to move";
   }
   if (current) scene.remove(current);
   current = obj;
   scene.add(obj);
   renderer.setAnimationLoop(mixer ? () => { mixer.update(clock.getDelta()); draw(); } : null);
-  if (keepView && framed === file) return draw();
+  if (keepView && framed === file) { lastSortDir.set(9, 9, 9); return draw(); }
   framed = file;
-  const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() || 1;
+  const c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() || 1;
   controls.target.copy(c);
   camera.position.copy(c).add(new THREE.Vector3(0.55, 0.5, 1.2).multiplyScalar(r));
   camera.near = r / 200; camera.far = r * 200; camera.updateProjectionMatrix();
   controls.update();
+  lastSortDir.set(9, 9, 9);
   draw();
 }
+modeEl.onchange = () => {
+  if (!splatState) return;
+  if (current) scene.remove(current);
+  current = modeEl.value === "points" ? splatState.points : splatState.mesh;
+  scene.add(current);
+  lastSortDir.set(9, 9, 9);
+  draw();
+};
 function list(state) {
   const was = pick.value;
   pick.replaceChildren(...state.models.map((m) => new Option(m, m)));
-  if (!state.models.length) { document.getElementById("info").textContent = "no .glb or .ply yet: export3d(...) in the art file writes them"; return; }
+  if (!state.models.length) { infoEl.textContent = "no .glb or .ply yet: export3d(...) in the art file writes them"; return; }
   pick.value = state.models.includes(was) ? was : state.models[0];
   show(pick.value, true);
 }
 pick.onchange = () => show(pick.value);
 new EventSource("/events").addEventListener("build", (ev) => list(JSON.parse(ev.data)));
-const fit = () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); draw(); };
+const fit = () => {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  if (splatState) splatState.mat.uniforms.uViewport.value.set(innerWidth, innerHeight);
+  draw();
+};
 addEventListener("resize", fit);
 fit();
 </script>

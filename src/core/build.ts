@@ -331,6 +331,10 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     }
     if (!(w >= 1 && h >= 1)) throw new PxError("no size: give { w, h } or a grid string");
     base = whole ? new Img(whole[0], whole[1]) : new Img(w, h);
+    if (opts.bg) {
+      const bg = pal.resolve(opts.bg);
+      if (bg !== null && !skipPixels) base.fill(bg);
+    }
   }
 
   // Current layer being painted, so traced frames show the composite in progress.
@@ -374,6 +378,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     c.frame = tick?.frame ?? frame + (tl && !tl.once ? Math.floor(t / tl.loop) * frames : 0);
     c.frames = tick?.frames ?? frames;
     c.loop = tl ? tl.loop : clock?.loop ?? 0;
+    c.hold = def.kind === "scene" && opts.loop === "hold";
     c.inAnim = !!tl;
     c.mirrored = !!def.mirror;
     c.k = opts.pixel ?? 1;
@@ -392,6 +397,13 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     return c;
   };
   const main = onCamera(timed(new Canvas(base, pal, ctx, 0, 0, seed)), moved(""));
+  // Seed asset-level `sockets` before items run so c.shake() shifts them and c.setSocket() merges cleanly
+  if (opts.sockets !== undefined) {
+    const so = opts.sockets as unknown;
+    if (typeof so !== "object" || so === null || Array.isArray(so) || !Object.values(so).every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)))
+      throw new PxError(`sockets must be { name: [x, y], ... } in drawing coords, got ${fmtArgs([so])}`);
+    base.sockets = Object.fromEntries(Object.entries(so as Record<string, number[]>).map(([k, p]) => [k, [def.mirror ? base.w - p[0] : p[0], p[1]] as [number, number]]));
+  }
   hook(main);
   // After lighting(), pixels it changed still count as their palette color for glow().
   let preLight: { before: Uint32Array; after: Uint32Array } | undefined, lamps: Lamp[] | undefined;
@@ -532,6 +544,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     layers.push({ name: l.name, img: limg, ...(o.hidden ? { how: "hidden" as const } : plain ? {} : { how: "blended" as const, mode: words }), ...(o.unlit ? { unlit: true } : {}) });
     snap?.(`layer '${l.name}'${l.opts.hidden ? " (hidden)" : ""}`, l.loc);
   });
+  if (main.img !== base) base = main.img;
 
   if (opts.register !== undefined) {
     register(base, refs.map((r) => r.img), opts.register, pal, frame);
@@ -704,12 +717,6 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
   // a twin: drawn mirrored, its pivot and sockets mirrored with it (drawing coords: x -> w - x)
   const mx = (p: number[]): [number, number] => [def.mirror ? img.w - p[0] : p[0], p[1]];
   if (Array.isArray(pv)) img.pivot = mx(pv);
-  if (o.sockets !== undefined) {
-    const so = o.sockets as unknown;
-    if (typeof so !== "object" || so === null || Array.isArray(so) || !Object.values(so).every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)))
-      throw new PxError(`sockets must be { name: [x, y], ... } in drawing coords, got ${fmtArgs([so])}`);
-    img.sockets = Object.fromEntries(Object.entries(so as Record<string, number[]>).map(([k, p]) => [k, mx(p)]));
-  }
   if (o.facing !== undefined) {
     const f = FACING[(def.mirror ? { right: "left", left: "right" }[o.facing as string] : undefined) ?? (o.facing as string)];
     if (!f) throw new PxError(`facing must be "right", "left", "front" (toward us) or "back", got ${fmtArgs([o.facing])}`);

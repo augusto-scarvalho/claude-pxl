@@ -79,7 +79,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   // pixel art: few colors and hard steps between them, once a copy's noise is folded away; a grid
   // found under the noise says so too
   const folded0 = mergeNear(unchecker(raw), smeared ? 0.07 : 0.03), smooth = smoothShare(folded0);
-  const pixelArt = colorCounts(folded0).size <= 256 && (up || smooth < 0.35);
+  const pixelArt = colorCounts(folded0).size <= 256 && (up || opts.px === 1 || smooth < 0.35);
   // and a reflection under it (a floor that shines): told and left out of the rest
   const raws = input.frames.map((f, i) => (i ? (pixelArt && up && !pre ? toNative(f, g) : f) : raw));
   const reflection = pixelArt && !smeared ? findReflection(raws, checker) : null;
@@ -877,6 +877,16 @@ function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: nu
     const sm = !p.smears ? "" : p.kind === "carried" ? ` Smears on frames ${spans(p.smears.frames)} (${p.smears.colors.map(hex).join(", ")}: there a moment only): a streak behind it on the frames it goes fastest, stamp(name, x, y, { smear: [fromX, fromY] }) (its box and spacing measured without it).`
       : ` Smears on frames ${spans(p.smears.frames)} (${p.smears.colors.map(hex).join(", ")}: there a moment only): the shape the swing sweeps, on the frames it goes fastest, arc(cx, cy, r, from, to, c, { inner, taper }) in a layer with unlit: true, outline: false (characters.md: its last 100 degrees at most, thin at its tail).`;
     const sub = p.sub ? `, moving by part of a pixel (subpixel: its parts stamped with { sub: true } at half-pixel places)` : "";
+    const trans = !p.translucent ? "" : p.translucent.blend === "add"
+      ? `, translucent additive (layer({ blend: "add", opacity: ${p.translucent.opacity} })${p.translucent.tint ? `, tint ${hex(p.translucent.tint)}` : ""})`
+      : `, translucent (alpha ~${Math.round(p.translucent.opacity * 100)}%: layer({ opacity: ${p.translucent.opacity} })${p.translucent.tint ? `, color ${hex(p.translucent.tint)}` : ""})`;
+    const flt = !p.float ? "" : (() => {
+      const xs = p.float.map((v) => v[0]), ys = p.float.map((v) => v[1]);
+      const hasX = xs.some((v) => v !== 0), hasY = ys.some((v) => v !== 0);
+      if (hasY && !hasX) return `, whole-body float y: ${ys.join(" ")} px`;
+      if (hasX && !hasY) return `, whole-body float x: ${xs.join(" ")} px`;
+      return `, whole-body float: ${p.float.map(([x, y]) => `${x},${y}`).join(" ")} px`;
+    })();
     // one cycle in place, the clip its whole loop
     const loop = p.loop === "pingpong" ? `, one cycle in place played there and back (its drawings out, then the same back: dir: "pingpong")`
       : p.loop === "halves" ? `, one cycle in place whose second half is its first with the near and far limbs swapped (a run, a walk: draw half, then copy it and swap the limbs)`
@@ -886,7 +896,7 @@ function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: nu
     // ten times brighter at its brightest than at its dimmest is more than light does to what is there:
     // paint that comes and goes (a flash, a smear, sparks, a limb drawn light then dark)
     const paint = p.kind === "light" && (p.strength ?? 0) > 10;
-    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}${loop}${rep}${sub}: ${paint ? `read as a light, but more likely paint that comes and goes (a flash, a smear, sparks, a part drawn light then dark): ${WHAT.effect}` : WHAT[p.kind]}.${sm}`);
+    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}${loop}${rep}${sub}${trans}${flt}: ${paint ? `read as a light, but more likely paint that comes and goes (a flash, a smear, sparks, a part drawn light then dark): ${WHAT.effect}` : WHAT[p.kind]}.${sm}`);
     // (a thing going somewhere, or an action, over a short clip: elsewhere a box's steps are its drawings
     // changing, a limb reaching out, not the thing moving)
     // a walk whose steps vary (a jump, a dash) is read too; in place, a body squashing on a ground that
@@ -936,7 +946,7 @@ function piecesOut(d: ReturnType<typeof decompose>, ms: number[]): { sheet: Img;
   }
   const json = {
     frames: d.frames, ms: Math.round(ms.reduce((a, v) => a + v, 0) / ms.length), backdrop: +d.still.toFixed(3),
-    pieces: list.map((p, i) => ({ id: i + 1, kind: p.kind, box: p.box, frames: p.frames, drawings: p.poses, cycle: p.cycle, ...(p.speed ? { speed: p.speed.map((v) => +v.toFixed(3)) } : {}), ...(p.grow !== undefined ? { grow: +p.grow.toFixed(2) } : {}), ...(p.parts ? { parts: p.parts } : {}), ...(p.round ? { round: true } : {}), ...(p.smears ? { smears: { frames: p.smears.frames, colors: p.smears.colors.map(hex) } } : {}), ...(p.source ? { source: p.source, strength: +p.strength!.toFixed(2), tint: hex(p.tint!) } : {}), fill: +p.fill.toFixed(2), strip: { file: `_piece${i + 1}.png`, frames: p.stripFrames, w: p.strip.w / p.stripFrames, h: p.strip.h }, track: p.track })),
+    pieces: list.map((p, i) => ({ id: i + 1, kind: p.kind, box: p.box, frames: p.frames, drawings: p.poses, cycle: p.cycle, ...(p.speed ? { speed: p.speed.map((v) => +v.toFixed(3)) } : {}), ...(p.grow !== undefined ? { grow: +p.grow.toFixed(2) } : {}), ...(p.parts ? { parts: p.parts } : {}), ...(p.round ? { round: true } : {}), ...(p.smears ? { smears: { frames: p.smears.frames, colors: p.smears.colors.map(hex) } } : {}), ...(p.float ? { float: p.float } : {}), ...(p.translucent ? { translucent: { blend: p.translucent.blend, opacity: p.translucent.opacity, ...(p.translucent.tint ? { tint: hex(p.translucent.tint) } : {}) } } : {}), ...(p.source ? { source: p.source, strength: +p.strength!.toFixed(2), tint: hex(p.tint!) } : {}), fill: +p.fill.toFixed(2), strip: { file: `_piece${i + 1}.png`, frames: p.stripFrames, w: p.strip.w / p.stripFrames, h: p.strip.h }, track: p.track })),
   };
   return { sheet: out, json, strips: list.map((p) => p.strip) };
 }

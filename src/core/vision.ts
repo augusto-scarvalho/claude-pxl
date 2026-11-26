@@ -42,6 +42,7 @@ export function findGrid(img: Img, size?: number): Grid {
     return [1, 0];
   };
   if (size) {
+    if (size === 1) return { sx: 1, sy: 1, ox: 0, oy: 0 };
     // a size given (a blurred copy read at a harmonic of its pixel): the offset whose lines catch the most change
     const off = (prof: Float64Array) => {
       let bo = 0, bv = -1;

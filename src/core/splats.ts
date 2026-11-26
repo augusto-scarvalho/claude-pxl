@@ -5,7 +5,7 @@
 // covariance carried through the camera, EWA), the nearest first, their opacity gathered until a pixel is
 // full; then the gathered light snapped to the material's ramp in clusters, thin edges dithered, an
 // outline on the side away from the light where it is solid. Written as a 3DGS .ply (files3d.ts).
-import { type Color, TRANSPARENT } from "./color.ts";
+import { type Color, TRANSPARENT, oklab, pack } from "./color.ts";
 import { PxError } from "./errors.ts";
 import { sizeOf } from "./grids.ts";
 import { type Clock, Density, STILL, Sdf, type V3, article, compile, compileDensity } from "./sdf.ts";
@@ -21,6 +21,12 @@ export class Splats {
   /** details scattered on a form (scatter.ts): each one's brush (0 an ellipse), its step along the ramp, its flutter's phase, and how the form carries them at a moment */
   brush?: Uint8Array; shift?: Int8Array; phase?: Float32Array;
   move?: (clock: Clock) => (i: number, p: V3) => V3;
+  /** Imported 3DGS .ply spherical harmonics: DC coefficients (3 floats/splat), optional SH degree 1..3 and channel-major f_rest coefficients. */
+  dc?: Float32Array;
+  shDeg?: number;
+  shRest?: Float32Array;
+  /** Whether imported SH coefficients are expressed in Y-up coordinates (standard 3DGS .ply). */
+  shYup?: boolean;
   constructor(n: number, mats: string[]) {
     this.n = n; this.mats = mats;
     this.pos = new Float32Array(n * 3); this.scale = new Float32Array(n * 3); this.rot = new Float32Array(n * 4); this.opacity = new Float32Array(n);
@@ -139,6 +145,56 @@ export function splatLight(S: Splats, i: number, L: V3, ambient = 0.35): number 
   return 0.1 + 0.65 * Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]) * S.sun[i] + 0.2 * (0.5 + 0.5 * nz);
 }
 
+/** Standard real spherical harmonic constants used by 3D Gaussian Splatting (degrees 0..3). */
+const SH_C0 = 0.28209479177387814;
+const SH_C1 = 0.4886025119029199;
+const SH_C2 = [1.0925484305920792, -1.0925484305920792, 0.31539156525252005, -1.0925484305920792, 0.5462742152960396];
+const SH_C3 = [-0.5900435899266435, 2.890611442640554, -0.4570457994644658, 0.3731763325901154, -0.4570457994644658, 1.445305721320277, -0.5900435899266435];
+
+/**
+ * Evaluate a 3DGS splat's view-dependent sRGB color [r, g, b] in [0, 1] from its SH DC and optional
+ * higher-order `f_rest_*` coefficients (degrees 1..3), given unit viewing direction `dir` (camera -> splat) in pxl Z-up.
+ */
+export function evalSplatColor(S: Splats, i: number, dir: V3): [number, number, number] {
+  const dc = S.dc;
+  if (!dc) return [0.5, 0.5, 0.5];
+  let r = 0.5 + SH_C0 * dc[i * 3];
+  let g = 0.5 + SH_C0 * dc[i * 3 + 1];
+  let b = 0.5 + SH_C0 * dc[i * 3 + 2];
+  const deg = S.shDeg ?? 0, rest = S.shRest;
+  if (deg > 0 && rest) {
+    // Convert pxl Z-up viewing direction into Y-up if the PLY was trained in standard Y-up coordinates
+    const x = dir[0], y = S.shYup ? dir[2] : dir[1], z = S.shYup ? -dir[1] : dir[2];
+    const K = (deg + 1) * (deg + 1) - 1;
+    const base = i * 3 * K;
+    const addChan = (cOff: number): number => {
+      let v = SH_C1 * (-y * rest[cOff] + z * rest[cOff + 1] - x * rest[cOff + 2]);
+      if (deg >= 2) {
+        const xx = x * x, yy = y * y, zz = z * z, xy = x * y, yz = y * z, xz = x * z;
+        v += SH_C2[0] * xy * rest[cOff + 3]
+          + SH_C2[1] * yz * rest[cOff + 4]
+          + SH_C2[2] * (2 * zz - xx - yy) * rest[cOff + 5]
+          + SH_C2[3] * xz * rest[cOff + 6]
+          + SH_C2[4] * (xx - yy) * rest[cOff + 7];
+        if (deg >= 3) {
+          v += SH_C3[0] * y * (3 * xx - yy) * rest[cOff + 8]
+            + SH_C3[1] * xy * z * rest[cOff + 9]
+            + SH_C3[2] * y * (4 * zz - xx - yy) * rest[cOff + 10]
+            + SH_C3[3] * z * (2 * zz - 3 * xx - 3 * yy) * rest[cOff + 11]
+            + SH_C3[4] * x * (4 * zz - xx - yy) * rest[cOff + 12]
+            + SH_C3[5] * z * (xx - yy) * rest[cOff + 13]
+            + SH_C3[6] * x * (xx - 3 * yy) * rest[cOff + 14];
+        }
+      }
+      return v;
+    };
+    r += addChan(base);
+    g += addChan(base + K);
+    b += addChan(base + 2 * K);
+  }
+  return [Math.max(0, Math.min(1, r)), Math.max(0, Math.min(1, g)), Math.max(0, Math.min(1, b))];
+}
+
 export interface SplatOpts {
   view?: SurfaceView; ppm?: number; at?: number[];
   /** given a field or a density: made into splats this far apart now (and size, seed: sdf.splats's) */
@@ -150,11 +206,15 @@ export interface SplatOpts {
   blend?: "dither" | "cut" | "alpha";
   /** the darkest tone on the solid contour away from the light (default true) */
   outline?: boolean;
+  /** cast ground shadows from opaque splats onto z = floor (true, a color key, or { color?, floor?, opacity? }) */
+  cast?: boolean | string | { color?: string; floor?: number | "min"; opacity?: number };
+  /** for imported 3DGS .ply splats: snap SH RGB to the active palette (default true; false keeps true RGB) */
+  palette?: boolean;
   pixel?: number;
   /** the name of the part they are (pxl steps --at) */
   part?: string;
 }
-export const SPLAT_OPTS = ["view", "ppm", "at", "spacing", "size", "seed", "mats", "ramp", "light", "blend", "outline", "pixel", "part"];
+export const SPLAT_OPTS = ["view", "ppm", "at", "spacing", "size", "seed", "mats", "ramp", "light", "blend", "outline", "cast", "palette", "pixel", "part"];
 /** A brush's cells (scatter.ts's BRUSH_CELLS, by its code): [dx, dy, a step along the ramp]. */
 const CELLS: number[][][] = [[], [[0, 0, 0]], [[0, 0, 1], [1, 0, 0], [0, 1, 0], [1, 1, -1]], [[0, -1, 1], [-1, 0, 0], [0, 0, 0], [1, 0, -1], [0, 1, -1]], [[0, 0, -1], [0, -1, 0], [0, -2, 1]], [[0, -1, 1], [1, -1, 0], [-1, 0, 1], [0, 0, 0], [1, 0, 0], [-1, 1, 0], [0, 1, -1], [1, 1, -1]]];
 
@@ -169,13 +229,17 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
   if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`${who}: pixel is px to a cell, a whole number from 1, got ${JSON.stringify(o.pixel)}`);
   if (!["dither", "cut", "alpha"].includes(blend)) throw new PxError(`${who}: blend is "dither", "cut" or "alpha", got ${JSON.stringify(o.blend)}`);
   const origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
-  // its materials' ramps
+  // its materials' ramps (not required when rendering SH-colored imported .ply splats without explicit mats/ramp)
+  const useShColor = !!S.dc && !o.mats && !o.ramp;
   const keys = (spec: unknown, what: string): Color[] => {
     const r = spec && typeof spec === "object" && !Array.isArray(spec) ? (spec as { ramp?: unknown }).ramp : spec, ks = typeof r === "string" ? [...r] : r;
     if (!Array.isArray(ks) || !ks.length) throw new PxError(`${who}: ${what} is a ramp of keys dark to light, got ${JSON.stringify(spec)}`);
     return ks.map((k) => { const col = c.color(k); if (col === null || col === TRANSPARENT) throw new PxError(`${who}: ${what}: '${k}' is not a color`); return col; });
   };
-  const names = Object.keys(o.mats ?? {}), ramps = o.mats ? names.map((n) => keys(o.mats![n], `material '${n}'`)) : [keys(o.ramp ?? c.pal.ramps[0], "ramp")];
+  const names = Object.keys(o.mats ?? {});
+  const ramps = useShColor
+    ? [[pack(0, 0, 0), pack(255, 255, 255)]]
+    : o.mats ? names.map((n) => keys(o.mats![n], `material '${n}'`)) : [keys(o.ramp ?? c.pal.ramps[0], "ramp")];
   const missing = S.mats.filter((m) => m && o.mats && !names.includes(m));
   if (missing.length) throw new PxError(`${who}: the splats' material ${missing.map((m) => `'${m}'`).join(", ")} is not in mats (it has: ${names.join(", ")})`);
   const matOf = S.mats.map((m) => (o.mats ? Math.max(0, names.indexOf(m)) : 0)), M = ramps.length;
@@ -189,11 +253,12 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
   }
   const lo: V3 = [Infinity, Infinity, Infinity], hi: V3 = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < S.n; i++) { const r = 2 * Math.max(S.scale[i * 3], S.scale[i * 3 + 1], S.scale[i * 3 + 2]); for (let e = 0; e < 3; e++) { lo[e] = Math.min(lo[e], P[i * 3 + e] - r); hi[e] = Math.max(hi[e], P[i * 3 + e] + r); } }
-  const cam = viewOf(c, o as never, lo, hi, undefined, who, persp, K, origin), { W, H, x0, y0, axisDepth, toScreen, L, lx, ly } = cam;
+  const cam = viewOf(c, o as never, lo, hi, undefined, who, persp, K, origin), { W, H, x0, y0, axisDepth, toScreen, L, lx, ly, F, eye } = cam;
 
   // each splat on the picture: its middle, its depth, its ellipse (the covariance through the camera's
   // slope there, a third of a cell added so none falls between cells), in cells
   const n = S.n, cx = new Float32Array(n), cy = new Float32Array(n), dep = new Float32Array(n), conic = new Float32Array(n * 3), rad = new Float32Array(n), tone = new Float32Array(n);
+  const shRgb = S.dc ? new Float32Array(n * 3) : undefined;
   const keep: number[] = [], brushes: number[] = [], lean = new Int8Array(n);
   for (let i = 0; i < n; i++) {
     const p: V3 = [P[i * 3], P[i * 3 + 1], P[i * 3 + 2]], q = toScreen(p);
@@ -215,7 +280,14 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
     const mid = (A + Cc) / 2, l1 = mid + Math.sqrt(Math.max(0.01, mid * mid - det));
     rad[i] = Math.ceil(3 * Math.sqrt(l1));
     cx[i] = q[0] / K; cy[i] = q[1] / K; dep[i] = axisDepth(p);
-    tone[i] = splatLight(S, i, L);
+    if (shRgb) {
+      const vdir: V3 = persp && eye ? unit([p[0] - eye[0], p[1] - eye[1], p[2] - eye[2]]) : F;
+      const [sr, sg, sb] = evalSplatColor(S, i, vdir);
+      shRgb[i * 3] = sr; shRgb[i * 3 + 1] = sg; shRgb[i * 3 + 2] = sb;
+      tone[i] = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
+    } else {
+      tone[i] = splatLight(S, i, L);
+    }
     // a detail smaller than a few cells: a pixel-art brush, not an ellipse
     if (S.brush?.[i] && Math.sqrt(l1) < 2) {
       brushes.push(i);
@@ -229,6 +301,7 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
   // the cells: gather each splat's opacity, the nearest first, until a cell is full (3DGS's blending)
   const gx0 = Math.floor(x0 / K), gy0 = Math.floor(y0 / K), GW = Math.ceil((x0 + W) / K) - gx0, GH = Math.ceil((y0 + H) / K) - gy0;
   const N = GW * GH, T = new Float32Array(N).fill(1), lt = new Float32Array(N), mw = new Float32Array(N * M), front = new Float32Array(N).fill(Infinity), vis = c.img.depth;
+  const accR = useShColor ? new Float32Array(N) : undefined, accG = useShColor ? new Float32Array(N) : undefined, accB = useShColor ? new Float32Array(N) : undefined;
   const behind = new Float32Array(N).fill(Infinity);
   if (vis) for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) { const q = c.index((gx0 + gx) * K, (gy0 + gy) * K); if (q >= 0) behind[gy * GW + gx] = vis[q]; }
   for (const i of keep) {
@@ -240,6 +313,7 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
         const dx = gx + 0.5 - ux, dy = gy + 0.5 - uy, a = Math.min(0.99, a0 * Math.exp(-0.5 * (k0 * dx * dx + 2 * k1 * dx * dy + k2 * dy * dy)));
         if (a < 1 / 255) continue;
         const wgt = T[j] * a;
+        if (accR && shRgb) { accR[j] += wgt * shRgb[i * 3]; accG![j] += wgt * shRgb[i * 3 + 1]; accB![j] += wgt * shRgb[i * 3 + 2]; }
         lt[j] += wgt * tone[i]; mw[j * M + mi] += wgt;
         T[j] -= wgt;
         if (T[j] < 0.5 && front[j] === Infinity) front[j] = dep[i];
@@ -247,24 +321,48 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
   }
   // each cell: its material (the one gathered most), its tone along that ramp, in clusters
   const mat = new Int16Array(N).fill(-1), tn = new Int8Array(N), al = new Float32Array(N);
+  const shCol = useShColor ? new Uint32Array(N) : undefined;
+  const palList = useShColor ? (c.pal.chosen().length ? c.pal.chosen() : [...c.pal.list]) : [];
+  const palLab = palList.map((col) => oklab(col));
+  const nearCache = new Map<number, Color>();
+  const nearestPal = (raw: Color): Color => {
+    if (!palList.length) return raw;
+    const hit = nearCache.get(raw);
+    if (hit !== undefined) return hit;
+    const [L, a, b] = oklab(raw);
+    let best = palList[0], bd = Infinity;
+    for (let k = 0; k < palList.length; k++) {
+      const p = palLab[k], d = (L - p[0]) ** 2 + (a - p[1]) ** 2 + (b - p[2]) ** 2;
+      if (d < bd) { bd = d; best = palList[k]; }
+    }
+    if (nearCache.size < 4096) nearCache.set(raw, best);
+    return best;
+  };
   for (let j = 0; j < N; j++) {
     const A = 1 - T[j];
     if (A < 0.02) continue;
     let best = 0;
     for (let m = 1; m < M; m++) if (mw[j * M + m] > mw[j * M + best]) best = m;
     mat[j] = best; al[j] = A;
-    tn[j] = Math.max(0, Math.min(ramps[best].length - 1, Math.round((lt[j] / A) * (ramps[best].length - 1))));
-  }
-  const was = tn.slice();
-  for (let gy = 1; gy < GH - 1; gy++)
-    for (let gx = 1; gx < GW - 1; gx++) {
-      const i = gy * GW + gx, k = mat[i];
-      if (k < 0) continue;
-      const nb = [i - 1, i + 1, i - GW, i + GW].filter((j) => mat[j] === k).map((j) => was[j]);
-      if (nb.length < 3 || nb.includes(was[i])) continue;
-      const best = nb.find((v) => nb.filter((u) => u === v).length >= 3) ?? (nb.length === 4 && nb.filter((u) => u === nb[0]).length === 2 ? nb[0] : undefined);
-      if (best !== undefined) tn[i] = best;
+    if (shCol && accR) {
+      const raw = pack(Math.round((accR[j] / A) * 255), Math.round((accG![j] / A) * 255), Math.round((accB![j] / A) * 255));
+      shCol[j] = o.palette === false ? raw : nearestPal(raw);
+    } else {
+      tn[j] = Math.max(0, Math.min(ramps[best].length - 1, Math.round((lt[j] / A) * (ramps[best].length - 1))));
     }
+  }
+  if (!useShColor) {
+    const was = tn.slice();
+    for (let gy = 1; gy < GH - 1; gy++)
+      for (let gx = 1; gx < GW - 1; gx++) {
+        const i = gy * GW + gx, k = mat[i];
+        if (k < 0) continue;
+        const nb = [i - 1, i + 1, i - GW, i + GW].filter((j) => mat[j] === k).map((j) => was[j]);
+        if (nb.length < 3 || nb.includes(was[i])) continue;
+        const best = nb.find((v) => nb.filter((u) => u === v).length >= 3) ?? (nb.length === 4 && nb.filter((u) => u === nb[0]).length === 2 ? nb[0] : undefined);
+        if (best !== undefined) tn[i] = best;
+      }
+  }
   // the brushes: each cell of each, nearer than what is there (and than the other brushes), in its tone
   // along its ramp (its light, its own step, the brush's shading)
   const bz = new Float32Array(N).fill(Infinity), bcol = new Uint32Array(N);
@@ -284,7 +382,55 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
   const shown = (j: number, gx: number, gy: number) => mat[j] >= 0 && (blend === "alpha" ? true : blend === "cut" ? al[j] > 0.5 : al[j] > 0.2 + 0.6 * bayer(gx0 + gx, gy0 + gy));
   const on = new Uint8Array(N);
   for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) { const j = gy * GW + gx; if (shown(j, gx, gy)) on[j] = 1; }
+  // Optional ground cast shadows from opaque splats projected along -L onto z = floor
+  if (o.cast && L[2] > 0.05) {
+    const cfg = typeof o.cast === "object" ? o.cast : typeof o.cast === "string" ? { color: o.cast } : {};
+    const floorZ = cfg.floor === "min" ? lo[2] : (cfg.floor ?? 0);
+    const shColor = cfg.color !== undefined ? c.color(cfg.color) : null;
+    if (cfg.color !== undefined && (shColor === null || shColor === TRANSPARENT))
+      throw new PxError(`${who}: cast color '${cfg.color}' is not a visible color`);
+    const shOp = cfg.opacity ?? 0.45;
+    const stepDown = shColor === null ? c.pal.stepMap(-1) : undefined;
+    const shBuf = new Float32Array(N);
+    for (let i = 0; i < n; i++) {
+      if (S.opacity[i] < 0.25) continue;
+      const pz = P[i * 3 + 2];
+      const tHit = (pz - floorZ) / L[2];
+      if (!(tHit > 0.01)) continue;
+      const sx = P[i * 3] - L[0] * tHit, sy = P[i * 3 + 1] - L[1] * tHit;
+      const gp = toScreen([sx, sy, floorZ]);
+      if (!gp) continue;
+      const sRad = Math.max(S.scale[i * 3], S.scale[i * 3 + 1], S.scale[i * 3 + 2]);
+      const gp2 = toScreen([sx + sRad, sy, floorZ]);
+      const rCell = Math.max(1, Math.min(24, Math.ceil((gp2 ? Math.hypot(gp2[0] - gp[0], gp2[1] - gp[1]) : sRad * 16) * 1.4 / K)));
+      const scx = gp[0] / K - gx0, scy = gp[1] / K - gy0;
+      for (let gy = Math.max(0, Math.floor(scy - rCell)); gy <= Math.min(GH - 1, Math.ceil(scy + rCell)); gy++)
+        for (let gx = Math.max(0, Math.floor(scx - rCell)); gx <= Math.min(GW - 1, Math.ceil(scx + rCell)); gx++) {
+          const d2 = ((gx + 0.5 - scx) ** 2 + (gy + 0.5 - scy) ** 2) / (rCell * rCell);
+          if (d2 > 1) continue;
+          const j = gy * GW + gx;
+          shBuf[j] = Math.min(1, shBuf[j] + S.opacity[i] * Math.exp(-2 * d2));
+        }
+    }
+    const shadowDark = shColor ?? pack(20, 20, 32);
+    for (let gy = 0; gy < GH; gy++)
+      for (let gx = 0; gx < GW; gx++) {
+        const j = gy * GW + gx;
+        if (on[j] || bcol[j] || shBuf[j] < 0.25) continue;
+        if (blend === "dither" && shBuf[j] < 0.35 + 0.45 * bayer(gx0 + gx, gy0 + gy)) continue;
+        for (let y = 0; y < K; y++)
+          for (let x = 0; x < K; x++) {
+            const px = (gx0 + gx) * K + x, py = (gy0 + gy) * K + y, q = c.index(px, py);
+            if (q < 0) continue;
+            const under = c.img.data[q];
+            if (shColor !== null) c.plot(px, py, under === TRANSPARENT || cfg.opacity === undefined || cfg.opacity >= 1 ? shColor : mixRgb(under, shColor, cfg.opacity));
+            else if (under !== TRANSPARENT) c.plot(px, py, stepDown?.get(under) ?? mixRgb(under, shadowDark, shOp));
+            else c.plot(px, py, (((shadowDark & ~255) | Math.round(shOp * 255)) >>> 0));
+          }
+      }
+  }
   const zbuf = (c.img.depth ??= new Float32Array(W * H).fill(Infinity)), pk = o.part !== undefined ? partIndex(c.img, o.part) : -1;
+  const darkCol = nearestPal(pack(16, 14, 24));
   for (let gy = 0; gy < GH; gy++)
     for (let gx = 0; gx < GW; gx++) {
       const j = gy * GW + gx;
@@ -301,10 +447,10 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
       }
       if (!on[j]) continue;
       const ramp = ramps[mat[j]];
-      let col = ramp[tn[j]];
+      let col = shCol ? shCol[j] : ramp[tn[j]];
       if (outline && al[j] > 0.6) {
         const open = (x: number, y: number) => x < 0 || y < 0 || x >= GW || y >= GH || !on[y * GW + x];
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (open(gx + dx, gy + dy) && dx * lx + dy * ly < 0 && !open(gx - dx, gy - dy)) { col = ramp[0]; break; }
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (open(gx + dx, gy + dy) && dx * lx + dy * ly < 0 && !open(gx - dx, gy - dy)) { col = shCol ? darkCol : ramp[0]; break; }
       }
       for (let y = 0; y < K; y++)
         for (let x = 0; x < K; x++) {

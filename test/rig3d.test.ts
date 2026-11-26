@@ -645,3 +645,68 @@ sprite("ok", { w: 4, h: 1 }, (c) => {
   const pDress = loadProject(file);
   assert.deepEqual([...pDress.image("ok").data].map((v) => (v & 255) === 255), [true, true, true, true], "farBy: 1 skips front-facing ties while preserving profile far-limb shading; farBy: 99 suppresses both");
 });
+
+test("rig3d & views Wave A: j.union, piece paint 4th normal arg, j.rod/j.smear { over }, baked head auto-size, views retouch on/false, per-move headings, pose dedup", () => {
+  // 1. j.union(pieces, { smooth, part }), 4th arg normal in paint, j.rod/j.smear { over: true }, per-move headings, pose dedup
+  const p = loadSource(`${PAL}
+ramps("kgrw")
+let sawNormal = 0, partCalls = 0
+rig3d("wa", {
+  w: 36, h: 42, pivot: [18, 40], headings: ["s", "w"], ink: "k",
+  parts: (j) => {
+    partCalls++
+    const blended = j.union([
+      j.limb(j.pelvis, j.chest, 4, 4, (h, _a, _out, n) => { if (Array.isArray(n) && n.length === 3) sawNormal++; return n[2] > 0.2 ? "w" : "g"; }),
+      j.ball(j.head, 4, "r"),
+    ], { smooth: 1.2, part: "merged" })
+    return { torso: blended }
+  },
+  moves: {
+    idle: {
+      frames: 3, pose: () => ({}),
+      draw: (_c, j) => {
+        // Place rod & smear behind torso in 3D depth (+y is behind in "s" view), but force over: true
+        j.rod([j.chest[0] - 4, j.chest[1] + 8, j.chest[2]], [j.chest[0] + 4, j.chest[1] + 8, j.chest[2]], "w", { over: true })
+        j.smear([[j.chest[0] - 3, j.chest[1] + 8, j.chest[2] - 2], [j.chest[0] + 3, j.chest[1] + 8, j.chest[2] - 2]], 2, "r", { over: true })
+      },
+    },
+    emote: { frames: 1, headings: ["s"], pose: () => ({ lean: 8 }) },
+  }
+})
+sprite("norm_ok", { w: 1, h: 1 }, (c) => { if (sawNormal > 0) c.px(0, 0, "g") })`, "t.px.js");
+  assert.ok(p.assets.has("wa_emote_s") && !p.assets.has("wa_emote_w"), "per-move headings creates only requested heading");
+  const frames = p.frames("wa_idle_s");
+  assert.equal(frames.length, 3);
+  assert.deepEqual([...frames[0].img.data], [...frames[1].img.data], "deduped identical pose frames match pixel-for-pixel");
+  assert.deepEqual([...frames[0].img.data], [...frames[2].img.data]);
+  assert.ok(frames[0].img.parts?.names.some((n) => n.includes("merged")), "j.union preserves explicit part name");
+  const Wcol = p.pal.resolve("w")!, Rcol = p.pal.resolve("r")!;
+  assert.ok([...frames[0].img.data].filter((v) => v === Wcol).length >= 5, "j.rod({ over: true }) draws over nearer torso");
+  assert.ok([...frames[0].img.data].filter((v) => v === Rcol).length >= 5, "j.smear({ over: true }) draws over nearer torso");
+  assert.equal(p.image("norm_ok").get(0, 0), p.pal.resolve("g"), "piece paint callback receives 4th argument surface normal");
+
+  // 2. rig3d auto-size includes tall baked head sprite
+  const pHead = loadSource(`${PAL}
+views("_tallhat", { s: "rrrr\\nrrrr\\nrrrr\\nrrrr\\nrrrr\\nrrrr\\nrrrr\\nrrrr\\nrrrr\\nrrrr\\nrrrr\\nrrrr" }, { anchor: [2, 11] })
+rig3d("hat", {
+  headings: ["s"], ink: "k", head: "_tallhat",
+  parts: (j) => ({ body: j.limb(j.pelvis, j.chest, 3, 3, "g") }),
+  moves: { idle: { frames: 1, pose: () => ({}) } }
+})`, "t.px.js");
+  const hatIm = pHead.image("hat_idle_s"), hatB = hatIm.bounds()!;
+  assert.ok(hatB.y >= 0 && [...hatIm.data].filter((c) => c === pHead.pal.resolve("r")).length >= 40, "auto-size expands canvas height to fit tall baked head without clipping");
+
+  // 3. views() retouch { on: "part" } and retouch: false
+  const pViews = loadSource(`${PAL}
+ramps("kgrw")
+const h = sdf.sphere(3).mat("g").part("skin").union(sdf.box([6, 6, 3]).at(0, 0, 2.5).mat("r").part("hat"))
+views("v_part", h, { ink: "k", anchor: [2, 2], retouch: { s: { grid: "wwwww\\nwwwww\\nwwwww\\nwwwww\\nwwwww", on: "skin" } } })
+views("v_none", h, { ink: "k", anchor: [2, 2], retouch: false })`, "t.px.js");
+  const imPart = pViews.image("v_part_s"), imNone = pViews.image("v_none_s");
+  const rNone = [...imNone.data].filter((c) => c === pViews.pal.resolve("r")).length;
+  const rPart = [...imPart.data].filter((c) => c === pViews.pal.resolve("r")).length;
+  const wPart = [...imPart.data].filter((c) => c === pViews.pal.resolve("w")).length;
+  assert.equal(rPart, rNone, "retouch { on: 'skin' } leaves 'hat' part pixels untouched");
+  assert.ok(wPart > 0, "retouch { on: 'skin' } paints onto 'skin' part pixels");
+  assert.equal([...imNone.data].filter((c) => c === pViews.pal.resolve("w")).length, 0, "retouch: false applies no retouch");
+});

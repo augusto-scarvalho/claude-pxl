@@ -13,22 +13,24 @@ every command and flag.
 
 1. Start from the closest example or library entry ([below](#examples); `PXL list <file> --own --find <words>`
    maps exact line ranges so you read only the lines you need, never whole multi-thousand-line files).
-   Given a reference: `PXL shot ref.gif` or `PXL shot model.glb` (3D `.glb`/`.obj` orthographic
-   turnaround + proportions; JPEG/WebP/video need ffmpeg) shows it, and `PXL study ref.gif` reads
-   what in pxl makes each part (`PXL help "characters 2"`).
+   Given a reference: `PXL shot ref.gif` or `PXL shot model.glb` (3D `.glb`/`.obj`/`.stl`/`.blend`
+   turnaround + proportions; JPEG/WebP/video need ffmpeg) shows it, and `PXL study ref.gif` (or a PNG
+   frame folder, `--px 1`, or a 3D `.stl`/`.glb`/`.obj`/`.blend` model) reads what in pxl makes each
+   part (`PXL help "characters 2"`). `PXL blender` converts `.blend` ↔ `.glb` headlessly.
 2. Look in one call: `PXL shot art.px.js <name>` builds just that asset to `out/_shot/<name>.png`
    (or straight to `--out FILE.png` / `FILE.gif`), reports what changed since the last shot, and prints
    `check` warnings. Pack multiple views into **one** contact sheet PNG and one process instead of
    separate shots: `a+b+c` joins labelled cells on one row (spaces start new rows), `--cols N` wraps
    entries or globs into an N-column labelled grid, and `--quiet` (`-q`) trims non-warning chatter.
    Other flags: `--frames 0,12,30`, `--at x,y,w,h`, a sheet/group/glob, `--gif`, `--grey`, `--boxes`,
-   `--sockets`. Exact pixels: `PXL ascii art.px.js <name>` (`--trim` crops empty margins keeping exact
-   coordinates; `--anchor`, `--parts`, `--at x,y,w,h`). Scenes: `PXL describe art.px.js <scene>`
+   `--sockets`. Exact pixels: `PXL ascii art.px.js <name...>` (`--trim`, `--anchor`, `--parts`,
+   `--at x,y,w,h`). Scenes: `PXL describe art.px.js <scene>`
    (`--brief` when busy) gives positions, gaps, cover, contrast and motion as text — answer layout
    questions from it, not by eyeballing.
 3. Fix everything one look showed in one turn (every turn re-reads the whole conversation). After the
    first write, edit in place rather than rewriting the file whole. `describe --diff` lists what moved
-   or redrew; `shot --vs HEAD --diff` shows changed pixels; `PXL steps art.px.js <name> --at x,y`
+   or redrew; `shot --vs <HEAD|file|dir> --diff` (and `--gif --vs`) shows changes; `log(...)` prints
+   DSL debug values during `build`/`shot`; `PXL steps art.px.js <name> --at x,y`
    names the line and 3D part that painted a pixel (following `base` chains).
 4. Small scene edits ("move the stall left", "add a lantern", recolor, flip, turn):
    `PXL inspect art.px.js <scene> --find stall` (`--id <id>` for one), then
@@ -44,8 +46,8 @@ every command and flag.
    rules (`--fix`). Fix each warning or explain why it is meant; inspect LOOK lines (L-corners,
    jaggies, close tones, `--edges`). Check the last line: `"not run: lit side"` means add
    `world.light` or `lighting()`. Replacing approved art: keep `name_old` beside it
-   (`PXL shot art.px.js name name_old`) or use `PXL compare` (silhouette extents, or `--pixels` for
-   a pixel color diff). More: `PXL help "scenes 14"`.
+   (`PXL shot art.px.js name name_old`) or use `PXL compare` (`--anchor` aligns pivots, `--pixels`
+   for a color diff). More: `PXL help "scenes 14"`.
 7. Live preview if requested: start `PXL serve art.px.js` in the background, share the URL, and stop
    it when done. Never open a headless browser, and run one heavy job at a time.
 
@@ -118,11 +120,10 @@ One line per area; `PXL help <name>` prints full details for any op or option.
   or `(x, y) => bool`. `shade`/`light(region, steps, density)` step along `ramps`.
 - **Reuse**: `base` + `swap` for variants; `_parts` + `stamp` for details; `group` or loops for
   families; `pivot: "bottom"`, `id` and relations (`beside`, `on`, `along`, `apart`) + `expect`
-  (`PXL help expect`); `scatter` for texture; `tilemap`/`pattern`/`corners()` for terrain.
+  (`PXL help expect`); `scatter` for texture; `tilemap`/`pattern`/`corners()`/`sides()` for terrain.
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` (or `ms: [...]`) with `(c, fi)`
-  reading `fi`/`c.frame`/`c.phase`; stamping an anim animates the scene; `scroll()`, `clouds()`,
-  `plume()`, `c.cross()` loop seamlessly; `tween()` keys poses; `route()` walks paths (`px: true`
-  top-down, `px: "side"` platformer).
+  reading `fi`/`c.frame`/`c.phase`/`c.data()`; `scene({ loop: "longest" | "hold" })`; `scroll()`,
+  `clouds()`, `plume()`, `c.cross()` loop seamlessly; `tween()` keys poses; `route()` walks paths.
 - **Existing art**: `sprite("x", { png, normals, area, shrink, palettize })`, `anim(..., { png, frames })`, `rampmap`.
 - **Out**: `sheet()` (+ JSON with tags, `cell`, `format`, `scale`, `slots`, `normalSuffix`/`emitSuffix`),
   GIFs, Tiled `.tmj`, `build --aseprite`, `build --share 4`.
@@ -135,10 +136,11 @@ One line per area; `PXL help <name>` prints full details for any op or option.
 - **Effects & spells**: `effect(kind)` (dissolve, pixelate, dither, tint, distort, emit, aura, sway,
   energy), per-copy `fx`; `smoke()`, `emitter()` + `particles()`, `trail()`, `ability()`; `cast(spell(...))`
   (per-primitive depth in `mesh()`; `depth: "single"` for legacy).
-- **3D fields**: `sdf` via `surface()` (`flat`, `clean: { slivers, specks, keepGlint }`), `voxels()`,
-  `mesh()`, `volume()`, or `draw3d()`; `sdf.scatter` + `splats()`, `decal()`, `world3d` + `make3d` +
-  `expect3d`, scoped `look3d`, `turnaround({ sockets })`, `rig3d` (`rig3d.joints()`, per-move `w`/`h`/`pivot`,
-  per-arm `elbow`, `j.smear()`, `over: "depth"`), `export3d` (`PXL help "scenes 17"`).
+- **3D fields**: `sdf` (`lathe`, `prism`, `orient`, `grow`, closed planes) via `surface()` (`flat`,
+  `clean`), `voxels()`, `mesh()`, `volume()`, `draw3d()`, `sdf.scatter` + `sdf.splats("file.ply")` +
+  `splats({ cast })`, `decal()`, `world3d` + `make3d` + `expect3d`, scoped `look3d`, `turnaround({ sockets, pivot })`,
+  `rig3d` (`rig3d.joints()`, per-move `w`/`h`/`pivot`/`headings`, `j.union()`, `j.smear()`, `over`),
+  `export3d` (`PXL help "scenes 17"`).
 - **Procedural texture**: `hash`, `vnoise`, `fbm`, `fbmLoop`, `bayer`, `seamless` (`PXL help vnoise`).
 
 ## Examples

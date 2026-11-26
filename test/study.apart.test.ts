@@ -351,3 +351,83 @@ test("study tells how a thing is built: its tones, where its lights and darks si
   writePng(join(dir, "ball.png"), img);
   assert.match(await said("study", join(dir, "ball.png"), "--no-out"), /OBJECT \(how it is built\)\n  at \d+,\d+: \d+x\d+, 4 tones/);
 });
+
+test("study Wave E: overlapping crossing cars keep continuous separate tracks through occlusion", () => {
+  // Two distinct colored cars (red going right +3 px/frame, cyan going left -3 px/frame) on adjacent
+  // overlapping lanes (50% vertical overlap so both merge into one blob as they cross).
+  const W = 96, H = 40, N = 16;
+  const road = (x: number, y: number) => pack(42 + ((x + y) % 3) * 4, 44, 52);
+  const redCar = pack(220, 50, 45), cyanCar = pack(45, 200, 225);
+  const frames = Array.from({ length: N }, (_, t) => {
+    const im = new Img(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) im.set(x, y, road(x, y));
+    // Car A (red): x = 10 + 3*t, y = 12..20 (12x8)
+    const ax = 10 + 3 * t;
+    for (let y = 12; y < 20; y++) for (let x = ax; x < ax + 12; x++) if (im.inside(x, y)) im.set(x, y, redCar);
+    // Car B (cyan): x = 74 - 3*t, y = 16..24 (12x8) -> overlaps Car A on y=16..19 across t=9..12
+    const bx = 74 - 3 * t;
+    for (let y = 16; y < 24; y++) for (let x = bx; x < bx + 12; x++) if (im.inside(x, y)) im.set(x, y, cyanCar);
+    return im;
+  });
+  const r = study({ name: "cross_cars", frames, ms: frames.map(() => 80), kind: "test" }, { px: 1 });
+  const pieces = (r.pieces!.json as { pieces: { kind: string; frames: number; speed?: number[]; track: number[][] }[] }).pieces;
+  const rightCar = pieces.find((p) => p.speed && p.speed[0] > 2);
+  const leftCar = pieces.find((p) => p.speed && p.speed[0] < -2);
+  assert.ok(rightCar && leftCar, `both crossing cars tracked: ${JSON.stringify(pieces.map((p) => ({ kind: p.kind, speed: p.speed, frames: p.frames })))}`);
+  assert.ok(rightCar!.frames >= 15 && leftCar!.frames >= 15, `continuous tracks through overlap: right=${rightCar!.frames}, left=${leftCar!.frames}`);
+});
+
+test("study Wave E: alpha-blended and additive floating ghosts report whole-body float and translucency, while stationary lamps stay lights", () => {
+  const W = 64, H = 56;
+  const wall = (x: number, y: number) => ((Math.floor(x / 6) + Math.floor(y / 4)) % 2 === 0 ? pack(52, 46, 68) : pack(112, 92, 128));
+  const offsets = [0, 1, 2, 2, 1, 0];
+
+  // 1. Alpha-blended bobbing ghost (alpha = 0.6) over a brick wall
+  const alphaFrames = offsets.map((dy) => {
+    const im = new Img(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) im.set(x, y, wall(x, y));
+    for (let y = 14 + dy; y < 34 + dy; y++) for (let x = 22; x < 40; x++) {
+      const b = wall(x, y), br = (b >>> 24) & 255, bg = (b >>> 16) & 255, bb = (b >>> 8) & 255;
+      im.set(x, y, pack(Math.round(0.6 * 210 + 0.4 * br), Math.round(0.6 * 235 + 0.4 * bg), Math.round(0.6 * 245 + 0.4 * bb)));
+    }
+    return im;
+  });
+  const rAlpha = study({ name: "ghost_alpha", frames: alphaFrames, ms: offsets.map(() => 100), kind: "test" }, { px: 1 });
+  const pAlpha = (rAlpha.pieces!.json as { pieces: { kind: string; float?: number[][]; translucent?: { blend: string; opacity: number } }[] }).pieces;
+  const ga = pAlpha.find((p) => p.float && p.translucent);
+  assert.ok(ga, `alpha ghost detected with float + translucent: ${JSON.stringify(pAlpha)}`);
+  assert.deepEqual(ga!.float!.map((v) => v[1]), offsets, "exact vertical float trajectory");
+  assert.equal(ga!.translucent!.blend, "alpha");
+  assert.ok(Math.abs(ga!.translucent!.opacity - 0.6) <= 0.12, `opacity ~0.6, got ${ga!.translucent!.opacity}`);
+  assert.match(rAlpha.text.join("\n"), /translucent \(alpha ~\d+%.*whole-body float y: 0 1 2 2 1 0 px/);
+
+  // 2. Additive floating ghost over brick wall + stationary pulsing lamp on the right
+  const addFrames = offsets.map((dy, fi) => {
+    const im = new Img(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) im.set(x, y, wall(x, y));
+    // Additive ghost on left (x = 8..22, y = 14+dy..32+dy)
+    for (let y = 14 + dy; y < 32 + dy; y++) for (let x = 8; x < 22; x++) {
+      const b = wall(x, y), br = (b >>> 24) & 255, bg = (b >>> 16) & 255, bb = (b >>> 8) & 255;
+      im.set(x, y, pack(Math.min(255, br + 35), Math.min(255, bg + 70), Math.min(255, bb + 100)));
+    }
+    // Stationary pulsing lamp on right (x = 42..56, y = 16..34)
+    const s = [0.2, 0.5, 0.9, 0.9, 0.5, 0.2][fi];
+    for (let y = 16; y < 34; y++) for (let x = 42; x < 56; x++) {
+      const d = Math.hypot(x - 49, y - 25) / 10;
+      if (d < 1) {
+        const b = wall(x, y), br = (b >>> 24) & 255, bg = (b >>> 16) & 255, bb = (b >>> 8) & 255;
+        const k = (1 - d) * s;
+        im.set(x, y, pack(Math.min(255, Math.round(br + 110 * k)), Math.min(255, Math.round(bg + 80 * k)), Math.min(255, Math.round(bb + 20 * k))));
+      }
+    }
+    return im;
+  });
+  const rAdd = study({ name: "ghost_add", frames: addFrames, ms: offsets.map(() => 100), kind: "test" }, { px: 1 });
+  const pAdd = (rAdd.pieces!.json as { pieces: { kind: string; box: number[]; float?: number[][]; translucent?: { blend: string; opacity: number } }[] }).pieces;
+  const ghostAdd = pAdd.find((p) => p.box[0] < 30 && p.translucent?.blend === "add");
+  const lamp = pAdd.find((p) => p.box[0] >= 35 && p.kind === "light");
+  assert.ok(ghostAdd, `additive floating ghost rescued from light: ${JSON.stringify(pAdd)}`);
+  assert.notEqual(ghostAdd!.kind, "light");
+  assert.deepEqual(ghostAdd!.float!.map((v) => v[1]), offsets);
+  assert.ok(lamp, `stationary pulsing lamp stays a light: ${JSON.stringify(pAdd)}`);
+});

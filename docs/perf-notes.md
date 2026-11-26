@@ -613,5 +613,19 @@ What changed:
   assets and sheet members as soon as their last consumer finishes — keeping large multi-asset builds flat in memory instead of
   growing linearly with asset count.
 
+## Waves A–E: `rig3d` pose deduplication and `pxl study` calibration (2026-11)
+
+Measured via 5 alternating rounds against `HEAD` (`e2206a9`, detached temporary git worktree, `PXL_WORKERS=1`, `--no-cache --no-preview`, Windows laptop, Node 24):
+
+| benchmark (5 alternating rounds vs `e2206a9`) | `HEAD` median (min..max) | after median (min..max) | change |
+| --- | ---: | ---: | ---: |
+| `lib/characters/traveler.px.js` (cold, 1 worker) | 8.39 s (8.20..10.15) | **7.95 s** (7.79..9.19) | **−5.3%** |
+| `lib/characters/crew.px.js` (cold, 1 worker) | 9.58 s (9.06..9.83) | **9.11 s** (8.78..9.43) | **−4.9%** |
+
+- **`rig3d` pose deduplication (`src/core/rig3d.ts`):** caches rendered pose frames by `(heading, pose signature, resolved head)` when a move has no custom `draw` hook, skipping redundant ray-marches on repeated idle holds, cast holds, and shared stances across moves (larger speedups scale directly with duplicate-pose ratio).
+- **Pixel invariance (`scripts/hashes.ts --vs HEAD`):** 5,115 / 5,135 frames across `lib/characters/traveler.px.js` and `examples/hd2d/character_kit.px.js` are byte-for-byte identical; the 20 differing frames are the intended Wave A `rig3d` auto-size unclipping of wide-brimmed flatcaps (`hw_medium_flatcap` and `hw_tall_flatcap`, `21x45 → 22x45` and `21x55 → 22x55`).
+- **`pxl study` Wave E calibration (`scripts/calibrate.ts --summary --vs cal_before.json`):** overlapping crossing-object splitting (`splitCands`) and translucent/additive floating-body tracking (`bodyFloatAndTranslucency` / `movingAdditiveBody`) improved `sodium_hour` (overlapping freeway traffic: frames found `10% → 14%`, found `33 → 39` cars, masks P `46% → 48%`, R `53% → 55%`, light P `63% → 64%`) and `forest` (frames found `53% → 63%`, found `5 → 6`, masks P `73% → 77%`, R `71% → 75%`) with zero regressions across `party`, `road`, `no_magic_night`, `park`, and `tournament`.
+
+
 
 
