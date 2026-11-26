@@ -35,7 +35,7 @@ Below, `pxl` means `node bin/pxl.js` in the clone (or `node <path to the clone>/
 anywhere). Without cloning, `npx github:augusto-scarvalho/claude-pxl <command>` runs the same CLI.
 
 Reading videos, JPEG or WebP (only `pxl study`, `pxl shot` and `pxl compare` do) needs `ffmpeg` on your PATH. PNG
-and GIF need nothing.
+and GIF need nothing. Converting or inspecting `.blend` files (`pxl blender`, `pxl shot`, `pxl study`) needs Blender on your PATH.
 
 ## Your first sprite
 
@@ -80,8 +80,8 @@ Open http://127.0.0.1:4321/. Every time you save, the viewer rebuilds and replay
 changed op by op, so you see how it was painted. It writes the same `out/` files as `build`
 (`--no-out` to skip them, `--port` for another port). An HD scene with a long loop plays too: the
 viewer builds each frame when the page asks for it (a second or two each) and leaves that scene's
-`out/` files to `pxl build --only <scene>`. A file that exports 3D models (`export3d`) gets a "3D"
-link in the viewer: http://127.0.0.1:4321/3d turns them round with the mouse.
+`out/` files to `pxl build --only <scene>`. A file that exports 3D models (`export3d`) gets a "3D" link in the viewer: http://127.0.0.1:4321/3d
+turns `.glb` meshes and `.ply` Gaussian splats round with the mouse (with a Splats/Points toggle for `.ply`).
 
 ## An animation and a scene
 
@@ -146,14 +146,21 @@ left", "add another red one beside it"): it runs these same commands
 - **A scene's clock.** A scene runs on the clock of the animations it stamps. When its own functions
   pick what to draw by time (a hero who walks, then swings), give it a clock of its own:
   `scene("test", { w, h, frames: 48, fps: 12 }, ...)`. Otherwise its loop is the least common
-  multiple of its animations' loops. [`examples/topdown_hero/`](../examples/topdown_hero) does this.
+  multiple of its animations' loops — or pass `loop: "longest"` (each shorter anim wraps) or
+  `loop: "hold"` (holds its last frame) when mixing animations of unrelated lengths, and use
+  `c.asset(name)` to read a sprite/anim frame without adding it to the scene's loop.
+  [`examples/topdown_hero/`](../examples/topdown_hero) does this.
+- **Tiles and terrain.** Use `corners()` + `tilemap(..., { corners })` for top-down ground transitions,
+  or `sides()` + `tilemap(..., { sides })` for side-view platformer ground, walls, and cliffs (with
+  optional `map: (mask, col, row) => ...` for deterministic tile variants).
 - **Things going by.** `scroll()` moves a strip that wraps across the picture, one call per parallax
   plane; `axis: "y"` moves it down instead (a shooter's backdrop). A plane should move a whole number
   of px a frame, or 1 px every so many frames: otherwise it judders, and pxl warns and names a speed
   that doesn't. `clouds()` and `plume()` (smoke, steam) close their loops too
   (`pxl help "scenes 8 9 10"`).
 - **Sheets for a game.** `sheet("hero", ["idle_*", "walk_*"], { rows: "tag" })` puts each animation
-  on a row of its own, and the sheet's preview GIF plays every animation in it at once.
+  on a row of its own, and the sheet's preview GIF plays every animation in it at once. Pass
+  `normalSuffix` / `emitSuffix` if your engine expects custom normal/emission sheet suffixes.
 
 ## By hand or in 3D
 
@@ -167,14 +174,19 @@ once in meters and drawn as pixel art by pxl (`pxl help "scenes 17"`). What the 
   near and far limbs swap, where one skeleton and one set of moves give every direction. A prop seen
   from several sides (`turnaround()` draws it once per heading: the shrine's torii, hall, lanterns
   and foxes). Trees, rocks and mist that one sun has to light alike (`examples/nature/`, `volume()`).
+  You can also load real 3D Gaussian Splatting `.ply` captures via `sdf.splats("file.ply")` and
+  render them directly into pixel art with `splats()`.
 - **A head, both ways.** Model it (the skull, the hair, a hat), bake it once per view with
   `views(name, field, { retouch })` (five views for eight directions, the east the west's mirror),
-  then paint its face over each view by hand (`"."` keeps the render's pixel, `"_"` erases one). The
-  3D gets the hair's volume right; a face of fields and decals read worse than a painted one. Baked
-  once, it costs nothing a frame (`pxl help "a body that turns"`; the traveler, the miko).
+  then paint its face over each view by hand (`"."` keeps the render's pixel, `"_"` erases one; or
+  `{ grid, on: "face" }` to paint only over one 3D part). The 3D gets the hair's volume right; a face
+  of fields and decals read worse than a painted one. Baked once, it costs nothing a frame
+  (`pxl help "a body that turns"`; the traveler, the miko).
 - **What didn't work:** a whole tree as splats (soft blobs beside the same tree drawn by
-  `surface()`); a figure pre-rendered in Blender (a stiff borrowed walk, turns stuck at the angles
-  rendered, every fix of a proportion a round trip through another program).
+  `surface()`); a figure pre-rendered in Blender as a fixed sprite loop (a stiff borrowed walk, turns
+  stuck at the angles rendered, every fix of a proportion a round trip through another program).
+  When you *do* want to inspect a `.blend` model as a reference or move 3D assets between Blender and
+  pxl, `pxl blender` converts `.blend` ↔ `.glb` and renders matching turnarounds headlessly.
 
 What a frame costs, warm, on a 4-core laptop (i5-1035G1):
 
@@ -219,28 +231,32 @@ Useful options:
 
 | You want to | Run |
 | --- | --- |
-| see one asset now, without building everything | `pxl shot art.px.js slime` writes `out/_shot/slime.png` |
+| see one asset now, without building everything | `pxl shot art.px.js slime` writes `out/_shot/slime.png` (or `--out preview.png`) |
+| pack multiple assets into one labelled contact sheet | `pxl shot art.px.js a+b+c --cols 3 --quiet` (`+` joins on one row, spaces start new rows) |
 | see some frames side by side (in rows when too wide), or a part enlarged | `pxl shot art.px.js slime_hop --frames all --at 0,0,8,8` |
-| watch several animations play side by side | `pxl shot art.px.js walk_s walk_w walk_n --gif` writes one GIF |
+| watch several animations play side by side | `pxl shot art.px.js walk_s walk_w walk_n --gif` writes one GIF (`--gif --vs HEAD` stacks before/after) |
 | preview a long scene as a GIF, quickly | `pxl shot art.px.js street --gif --every 4` builds one frame in four and prints its size |
 | check the values (lights and darks) without the color | `pxl shot art.px.js meadow --grey` adds the same picture in greys |
-| see the guide layers (`ref: true`: guide rows, a skeleton) over the art | `pxl shot art.px.js meadow --ref` |
-| compare two versions | `pxl shot art.px.js slime slime_old`, or `--vs HEAD --diff` against your last commit |
-| the exact pixels as text | `pxl ascii art.px.js slime` |
+| see guide layers (`ref: true`), hit/hurt boxes, or sockets | `pxl shot art.px.js hero --ref --boxes --sockets` |
+| compare two versions | `pxl shot art.px.js slime slime_old`, or `--vs HEAD --diff` (also `--vs before_dir/` for uncommitted folders) |
+| inspect exact pixels, tight bounds, pivot offsets, or 3D parts | `pxl ascii art.px.js slime --trim --anchor --parts` (accepts multiple names at once) |
 | know what is where in a scene, what covers what | `pxl describe art.px.js meadow` (`--brief` when busy) |
-| find which line painted a pixel | `pxl steps art.px.js slime --at 3,2` |
-| check before calling it done | `pxl check art.px.js` (see below) |
+| find which line (and 3D part) painted a pixel | `pxl steps art.px.js slime --at 3,2` |
+| print debug values from inside a `.px.js` file | call `log("tag", value)` anywhere in your art code (prints during `build` / `shot`) |
+| check before calling it done | `pxl check art.px.js` (see below; `--edges` checks contour cleanup) |
 | post it | `pxl build art.px.js --share 4`: every asset 4 times bigger in `out/share/`, clean, a GIF when it moves |
-| get around a long file | `pxl list art.px.js` (each definition's line range and comment) |
+| get around a long file | `pxl list art.px.js --own --find slime` (each definition's line range and comment) |
 | look up an op or option | `pxl help <name>`; `pxl help` alone for the index |
-| take a ready prop, tree or character instead of drawing it | `pxl lib` lists the library, `pxl lib <entry>` prints a card and the `include` that takes it, `pxl lib draft make3d.oak --genre topdown16` turns a 3D one to a genre's camera ([lib/README.md](../lib/README.md)) |
-| match a reference sprite's silhouette | `pxl compare art.px.js hero ref.png --shrink 2`; `pxl compare ref.png` alone measures its rows |
-| hold a new part to one you approved, row by row | `pxl compare art.px.js head_new head_old` (or `other.px.js:head`) |
-| learn from finished art or a reference | `pxl study ref.gif` |
+| take a ready prop, tree, character, or mount instead of drawing it | `pxl lib` lists the library, `pxl lib <entry>` prints a card and the `include` that takes it, `pxl lib draft make3d.oak --genre topdown16` turns a 3D one to a genre's camera ([lib/README.md](../lib/README.md)) |
+| match a reference sprite's silhouette or diff pixel colors | `pxl compare art.px.js hero ref.png --shrink 2`; `pxl compare ref.png` alone measures its rows |
+| hold a new part to one you approved, row by row or pixel by pixel | `pxl compare art.px.js head_new head_old --anchor --pixels` (or `other.px.js:head`) |
+| learn from finished art, a frame folder, or a 3D model | `pxl study ref.gif`, `pxl study frames/ --px 1`, or `pxl study model.stl` |
+| preview a 3D reference model from multiple angles | `pxl shot model.stl --dirs 5 --pitch 20` (also `.glb`, `.obj`, `.blend`; `--up y` if tipped) |
+| convert `.blend` ↔ `.glb` or render headless Blender turnarounds | `pxl blender model.blend --out model.glb` (`--dry` previews the command) |
 | measure one thing moving in a reference | `pxl study ref.gif --at x,y,w,h` (its box every frame, its spacing; the region in the drawing's own pixels, as `shot` shows it) |
 | move, recolor, flip or add a thing in a scene without reading the file | `pxl inspect art.px.js meadow --find red`, then `pxl edit` ([above](#relations-rules-and-edits-by-name)) |
 | fix a scene's rule that fails (a gap too wide, the rock inside the house) | `pxl check art.px.js --fix` changes the one number that makes it hold and says which |
-| turn an exported 3D model round | `pxl serve art.px.js`, then the viewer's "3D" link |
+| turn an exported 3D model or Gaussian splat `.ply` round | `pxl serve art.px.js`, then the viewer's "3D" link |
 
 `pxl check` makes every check `describe` can warn on (facing, feet on the ground, lit side,
 lettering, and more) on every scene at every frame, and exits 1 when it finds anything. Its LOOK lines don't fail it: they point at the L-corners and jaggies of
@@ -249,30 +265,39 @@ pixels in `<name>_look.png`. Delete a doubled step on a smooth line; keep a corn
 
 ## Starting from a reference
 
-Give pxl the picture you want to learn from, a PNG, GIF, JPEG, WebP (animated too) or video, pixel
-art or not:
+Give pxl the picture, clip, folder of PNG frames, or 3D model you want to learn from — PNG, GIF,
+JPEG, WebP (animated too), video, a folder of frames, or a `.stl`, `.glb`, `.obj`, or `.blend` mesh:
 
 ```sh
-pxl shot ref.gif            # every frame of the clip on one sheet, at 1x
-pxl study ref.gif           # what it is made of, and what to use in pxl for each part
+pxl shot ref.gif                # every frame of a clip on one sheet, at 1x
+pxl study ref.gif               # what it is made of, and what to use in pxl for each part
+pxl study frames_dir/ --px 1    # a folder of native-resolution PNG frames as an animation
+pxl shot figurine.stl           # orthographic 5-angle turnaround sheet + proportions
+pxl study figurine.stl          # geometry, watertight/symmetry stats, 10-band silhouette + sprite size hints
 ```
 
-`study` reads pixel art back at 1× (even when it was posted enlarged or blurred) for its palette,
-ramps and their hue shifts, outlines, dithering, anti-aliasing, banding, the faults of its lines
-(L-corners, jaggies) and its light. It reads a photo or painting for its masses of light and dark
-and its colors, translated into a small picture to draw over. It finds the perspective (horizon,
-vanishing points). In a clip it also finds:
+For **2D art and clips**, `study` reads pixel art back at 1× (even when posted enlarged or blurred;
+pass `--px 1` for native 1× frames) for its palette, ramps and hue shifts, outlines, dithering,
+anti-aliasing, banding, line faults (L-corners, jaggies) and light. It reads a photo or painting for
+its masses of light and dark and its colors, translated into a small picture to draw over. It finds
+the perspective (horizon, vanishing points). In a clip it also finds:
 
 - the timing, the cycle and whether the loop closes; a GIF of exactly one cycle of an idle or a run
   in place is read as that cycle;
 - the parallax planes and their speeds, as bands of rows or as planes that share rows (a city's far
   blocks behind its near ones);
 - each moving piece (walks, things carried, anims in place, attacks with their smears, effects,
-  lights), cut out of the background, with the spacing of what travels (easing, anticipation,
-  overshoot, squash and stretch).
+  translucent floating ghosts, overlapping movers, lights), cut out of the background, with the
+  spacing of what travels (easing, anticipation, overshoot, squash and stretch).
 
-Everything goes to `out/_study/` next to the picture: a sheet to look at, the palette as `.hex`, and
-each piece as a strip. `--no-out` prints the text only.
+For **3D models** (`.stl` 3D-printing files, `.glb`, `.obj`, and `.blend` via Blender), `pxl shot`
+renders a clean orthographic multi-angle turnaround sheet (with embedded textures or VisCAM colors,
+defaulting to `--up z` for `.stl` and `--up y` for `.glb`/`.obj`; pass `--up y` or `--up z` if a
+file is tipped). `pxl study` adds triangle/vertex counts, watertight/volume checks for `.stl`,
+left-right symmetry score, a 10-band height silhouette profile, and suggested pixel-art canvas sizes.
+
+Everything goes to `out/_study/` next to the input: a sheet to look at, the palette as `.hex`, and
+(for clips) each piece as a strip. `--no-out` prints the text only.
 
 ## Where to read next
 

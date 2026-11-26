@@ -137,10 +137,12 @@ The agent can measure, check and compare, but it can't guess what you meant. Say
 - **Motion.** Still or animated; for a loop, its length (a 2 s idle, a 12 s scene) and what moves.
 - **Style.** Outlined or not, how many shades per material, clean lines or square ones, anti-aliased or
   hard-edged, what to avoid (dithering as texture, pillow shading).
-- **References.** As files the agent can open, not links: a PNG, a GIF, a WebP or a video. The agent
-  looks at them with `pxl shot ref.gif` (a clip's frames on one sheet) and reads them with
-  `pxl study ref.gif` (palette, ramps, outlines, light, perspective, timing, parallax planes, and each
-  moving piece cut out; see [Starting from a reference](getting-started.md#starting-from-a-reference)).
+- **References.** As files the agent can open, not links: a PNG, GIF, WebP, video, folder of PNG
+  frames, or a 3D model (`.stl`, `.glb`, `.obj`, `.blend`). The agent looks at them with
+  `pxl shot ref.gif` (or `pxl shot model.stl`) and reads them with `pxl study ref.gif` (palette,
+  ramps, outlines, light, perspective, timing, parallax planes, moving pieces — or for 3D models,
+  watertight/symmetry stats, 10-band silhouette profile, and suggested sprite sizes; see
+  [Starting from a reference](getting-started.md#starting-from-a-reference)).
 - **What must stay true.** "The pot beside the fire, 2 to 6 px", "the lantern in front of the
   hall". The agent places props by a relation (`beside`, `on`, `along`, `apart`), so they follow
   what they go with, and writes the rules as the scene's `expect`: `pxl check` holds them at every
@@ -157,18 +159,23 @@ it:
 
 1. **Read only what the task needs.** `pxl help` alone is an index: every op and option, and each
    guide's sections with their size. `pxl help <op>` prints what the reference says about one op and
-   where the examples use it; `pxl help "scenes 1 3 11 14"` prints those sections of a guide. An
-   example is mapped with `pxl list <file>` first, and only the lines needed are read. A reference
-   picture or clip is read with `pxl study ref.gif`. Guides and the reference are never dumped whole:
-   what an agent reads early is paid again on every later turn.
+   where the examples use it; `pxl help "scenes 1 3 11 14"` prints those sections of a guide. Check
+   `pxl lib` before drawing reusable assets from scratch; map any example with
+   `pxl list <file> --own --find <words>` first, and read only the lines needed. A reference picture,
+   clip, frame folder, or 3D model is read with `pxl study`. Guides and the reference are never dumped
+   whole: what an agent reads early is paid again on every later turn.
 2. **Look with one call.** `pxl shot art.px.js <name>` builds only that asset and writes a picture
-   to read. Its text says what changed since the last shot and what `pxl check` finds on it. Exact
-   pixels come as text from `pxl ascii art.px.js <name>`, cheaper than an image. A scene is also read
+   to read (pack multiple assets or angles into one labelled contact sheet with `a+b+c`, `--cols N`,
+   `--quiet`, and `--out FILE.png`; inspect hitboxes and sockets with `--boxes` / `--sockets`). Its
+   text says what changed since the last shot and what `pxl check` finds on it. Exact pixels, tight
+   bounds, pivot-relative coordinates, and 3D part IDs come as text from
+   `pxl ascii art.px.js <name...> --trim --anchor --parts`, cheaper than an image. A scene is also read
    as text: `pxl describe art.px.js <scene>` (`--brief` when busy) gives each object's position, gaps,
    cover, contrast and motion, which answers layout questions better than eyeballing; after an edit,
-   `--diff` lists what it moved, redrew or recolored. What is edited later gets an `id` (a stamp's,
-   `c.as`'s, a `mesh()` sprite's): describe and `--diff` name it by that, where "lantern #2" would
-   change with another lantern stamped before it, and moving it keeps its look.
+   `--diff` lists what it moved, redrew or recolored (`shot --vs <HEAD|file|dir> --diff` and
+   `--gif --vs` show visual diffs; `log(...)` prints DSL debug values). What is edited later gets an
+   `id` (a stamp's, `c.as`'s, a `mesh()` sprite's): describe and `--diff` name it by that, where
+   "lantern #2" would change with another lantern stamped before it, and moving it keeps its look.
 3. **Fix everything one look showed, in one turn.** All the edits go out as parallel tool calls in
    one message, then one look again. Every turn re-reads the whole conversation, so a turn per edit
    is what makes a long session expensive. After the first write the art file is changed with edits,
@@ -237,7 +244,8 @@ pixel art (`pxl help "scenes 17"`, [`examples/sdf/`](../examples/sdf)). Which dr
 | air: mist, smoke, a cloud, a glowing orb | `volume()` of an `sdf.density` |
 | leaves, moss, snow on a form | `sdf.scatter` (drawn as small brushes), not splats of the whole form |
 | a face, a door, a rune, a sign on a form | a hand-drawn `decal()`, a drawing per view it needs |
-| a captured or soft look to export | `splats()` and `.ply` (experimental) |
+| a captured 3DGS `.ply` or soft splat look | `sdf.splats("file.ply")` (SH 0–3) + `splats({ cast })`; `/3d` previews `.ply` |
+| an external 3D reference (`.stl`, `.glb`, `.obj`, `.blend`) | `pxl shot` / `pxl study` for orthographic turnarounds + proportions; `pxl blender` for `.blend` ↔ `.glb` |
 | a figure that turns and walks | `rig3d()`, its head baked per view by `views()` and retouched |
 | a prop as a game's sprites, one per heading | `turnaround()` (the shrine's torii, hall and lanterns) |
 | one thing in any of these ways | `draw3d(thing, { as: "voxels" })` |
@@ -291,7 +299,9 @@ What keeps a session cheap (the skill already asks the agent for the first three
   loaded when the task matches. `pxl help "scenes 1 3 11 14"` is about 5k tokens where `scenes.md`
   whole is about 28k (the size `pxl help` gives each section).
 - **Edit, don't rewrite.** A file written whole again stays in the conversation.
-- **Fewer turns.** One look per call, and all the fixes one look showed in one turn.
+- **Fewer turns and smaller tool output.** Pack multi-view checks into one contact sheet
+  (`a+b+c`, `--cols N`, `--quiet`), map large files with `pxl list --own --find` instead of reading
+  them whole, and batch all fixes from one look in a single turn.
 - **One big asset per conversation.** Start a new conversation for the next asset rather than
   carrying a long history.
 - **The right effort.** Thinking is the biggest share, and effort sets it: medium for drafts and

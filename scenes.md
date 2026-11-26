@@ -52,10 +52,14 @@ look at (`--frames 0-11` for some).
 
 ## 2. Ground, paths and tiles
 
-- **Paths, roads, shores and patches of ground are laid with tiles**, marked at tile corners with
-  `tilemap(..., { corners })` and a terrain tileset (drawn in code by `corners()`, or reduced from a
-  free LPC-style one): `examples/topdown.px.js`, `examples/tropical/trail.px.js`. A `curve` or `poly` stroke of dirt
-  reads as paint on top of the grass.
+- **Paths, roads, shores and patches of ground are laid with tiles**:
+  - Top-down terrains use tile corners with `tilemap(..., { corners })` and `corners()` (whose draw
+    callback receives a 5th `mask` bitmask arg), or reduced from a free LPC-style set:
+    `examples/topdown.px.js`, `examples/tropical/trail.px.js`. A `curve` or `poly` stroke of dirt
+    reads as paint on top of the grass.
+  - Side-view platformer ground, walls, roofs and cliffs use cardinal-edge autotiles with `sides()`
+    (16 edge combinations: N/E/S/W) and `tilemap(..., { sides })`. Pass a functional
+    `map: (mask, col, row) => tileName` to pick deterministic per-cell variants or decorations.
 - Tiles that repeat get `wrap: true` (or `"x"`/`"y"`): the preview shows them 3×3 (3×1, 1×3), so seams show,
   and drawing past an edge continues on the other side.
 - A side view's ground that isn't one row (a cave's floor, a ledge, a ceiling for what hangs from it):
@@ -499,6 +503,12 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   (`clouds()`, with `empty` slots for a sky where they form and thin away); smoke and steam rising
   from a point: `plume()`; soot or mist that comes and goes:
   thin it by `0.5 - 0.5·cos(2π·t)`, fading to nothing at the edge of the part that moves.
+- **Mixing animations of different lengths:** by default a scene's frame count is the least common
+  multiple of the anims it stamps (capped with a warning naming the `cappedBy` anims). Pass
+  `scene(..., { loop: "longest" })` to run for the longest anim while shorter ones wrap cleanly, or
+  `loop: "hold"` to hold shorter anims on their last frame; read another asset's pixels without
+  pulling it into the scene's loop via `c.asset(name)`. For seamless animated noise and fires, use
+  `fbmLoop` and `flame(..., { style: "plume" })`.
 - Gaits: a stride a whole number of frames, and the loop a multiple of every stride in it.
 - A level run to its end (a scene's `camera`, §10): the picture fades to black over the last frames and
   in from black over the first, so the jump back to the start is never seen: a last layer with
@@ -886,9 +896,15 @@ is along a level (§10); the same `mix` on every layer, the sky's with its own m
 
 - `PXL shot <file> <scene>`: the look, with what changed since the last shot and the warnings on
   it; `--at x,y,w,h` again and again for details side by side, `--frames` for moments of the loop,
-  another version as a second name (`old.px.js:scene`) for a before and after, or `--vs HEAD --diff`
-  for the last commit above and the changed pixels in red below. Several of the file's own side by
-  side, labelled (variants, tiers, views): a scene of `cells(rows, { head, side })`.
+  `a+b+c` / `--cols N` for labelled contact sheets in one call, `--quiet` (`-q`) to suppress
+  non-warning chatter, `--boxes` and `--sockets` to verify hitboxes and attachment points, another
+  version as a second name (`old.px.js:scene`), or `--vs <HEAD|file|dir> --diff` (also `--gif --vs`
+  for stacked before/after GIFs). Several of the file's own side by side, labelled (variants, tiers,
+  views): a scene of `cells(rows, { head, side })`.
+- `PXL ascii <file> <name...>`: exact pixels as palette keys (`--trim` crops tightly keeping canvas
+  coords, `--anchor` numbers axes relative to the pivot, `--parts` prints 3D part IDs, `--at` crops a
+  region). `PXL compare` compares silhouettes (`--anchor` aligns pivots, `--pixels` prints a color
+  diff). Inside `.px.js`, call `log(...)` to print debug values during `build` or `shot`.
 - `PXL describe <file> <scene>`: every object's visible ranges, gaps, cover, contrast and motion
   (`--brief` for busy scenes); after an edit, `--diff` lists what moved, was redrawn or recolored.
   Give what you will edit an `id` (a stamp's, `c.as`'s, a `mesh()` sprite's): describe, `--diff` and
@@ -1013,16 +1029,19 @@ A thing that turns, sways or is seen from several cameras can be described once 
 and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn so (the nature kit's
 `_spruce` and `_snag`, `make3d.spruce` and `make3d.snag`): a material's `hem` and `strokes`, a back light's `rim: 0.85`. What held, from building them:
 
-- **Four kinds, never one.** A distance (`sdf.*`) for solid forms, drawn by `surface()`, `voxels()`
-  or `mesh()`; a density (`sdf.density`) for air (mist, smoke, cloud), drawn by `volume()`; an
-  appearance (`.mat()`, `.paint()`) for what each part is made of; an occupancy for voxels. A cloud as
-  a distance has a hard edge; a rock as a density has none.
-- **Splats for detail, not form.** A whole tree laid as splats read as soft blobs beside the same tree
-  drawn by `surface()`. Keep the form a field and scatter the small things on it (`sdf.scatter`):
-  leaves 20 to 40 to a square meter, each under about 4 px drawn as a brush (a 2x2 clump, a leaf, a
-  blade), never in the ramp's darkest tone and with no outline of its own (outlined, they read as dark
-  speckle). Moss and snow only where the form faces up (`up` 0.66 hugs a painted patch; at 0.55 tufts
-  landed on bare stone and read as noise).
+- **Four kinds, never one.** A distance (`sdf.*` — including `sdf.lathe()` for revolved vessels/domes,
+  `sdf.prism()` for beveled extruded polygons, `sdf.orient()` for axis alignment, `field.grow()` for
+  thickness/shelling, closed half-space polytopes in `sdf.intersect()`, and `field.mat({ override: true })`
+  to recolor sub-fields) for solid forms, drawn by `surface()`, `voxels()` or `mesh()`; a density
+  (`sdf.density`) for air (mist, smoke, cloud), drawn by `volume()`; an appearance (`.mat()`,
+  `.paint()`) for what each part is made of; an occupancy for voxels. A cloud as a distance has a hard
+  edge; a rock as a density has none.
+- **Splats: detail brushes and real 3DGS captures.** Procedural splats of a whole tree read as soft
+  blobs beside `surface()` — keep organic foliage as a field + `sdf.scatter` (20–40 leaves per m²,
+  under ~4 px each as a brush, never in the ramp's darkest tone or outlined; moss/snow with `up: 0.66`).
+  For real 3D Gaussian Splatting captures, `sdf.splats("capture.ply", { filter, scale, rot, translate })`
+  imports binary `.ply` splats with full SH degrees 0–3, renders them through `splats({ cast })`
+  (casting shadows onto the ground), and previews exported `.ply` files interactively at `/3d`.
 - **Decals or a sprite per view.** A face of 11 rows or less on a sprite figure: draw it per view by
   hand (`characters 5 6`). On a 3D form: a decal, drawn once per view it needs (front under 25
   degrees from the eye, three quarters under 65, profile beyond, mirrored for the other side), so it
@@ -1073,18 +1092,25 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn
 - **A turnaround: a 3D thing as a game's sprites.** `turnaround("house", make3d.house(), { view: "iso",
   n: 4 })` draws it from each heading, the camera and the light going round it (so every sprite is lit
   from the same side), one size, the pivot at its foot, named by the compass: `house_ne`, `house_se`,
-  ... (4 in iso: its diagonals; 8; 16: `n, nne, ne, ene, ...`). Stamp them in any scene; through the
-  HD-2D camera, among `mesh()`'s faces. `surface: { soft: 0.6, rim: 0.85, outline: false }` gives it
-  surface()'s look (a tree's); `draw: (c, v) => ...` draws by hand over each heading where `v.screen(p)`
-  puts a point: what hangs off it (paper streamers under a rope), which a decal, cut at its surface, can't. Something symmetric lit from above or in front mirrors its west
-  for its east, as a game flips it (`examples/sdf/turnaround.px.js`): a sprite the game flips is lit
-  from straight above. Its pivot is the thing's origin; what reaches under it (a trunk's round tip and near side, 6-8 px at
-  pitch 10) goes into what is under the row it is stamped on: `pivot: "foot"` puts each sprite's pivot on
-  its drawn foot (the lowest row over where it meets the ground, `foot` in each frame's data either way).
-- **Out to other tools.** `export3d` writes `.vox`, `.obj`, `.glb` and `.ply`; something that moves,
-  as a function of the clock with `frames`, goes out as one `.glb` that plays (and a file a moment for
-  the others). `pxl serve` shows the `.glb` and `.ply` to turn round at `/3d`. `mesh()` draws a mesh
-  in `surface()`'s side, top and iso views too.
+  ... (4 in iso: its diagonals; 8; 16: `n, nne, ne, ene, ...`). Pass `sockets: { saddle: [x, y, z] }`
+  to project 3D attachment points into 2D sockets on every heading (`PXL shot ... --sockets`). Stamp
+  them in any scene, or draw camera-sorted 3D sprite billboards outside `mesh()` with `sprites3d()`.
+  `surface: { soft: 0.6, rim: 0.85, outline: false }` gives it surface()'s look (a tree's);
+  `draw: (c, v) => ...` draws by hand over each heading where `v.screen(p)` puts a point: what hangs
+  off it (paper streamers under a rope), which a decal, cut at its surface, can't. Something symmetric
+  lit from above or in front mirrors its west for its east, as a game flips it
+  (`examples/sdf/turnaround.px.js`): a sprite the game flips is lit from straight above. Its pivot is
+  the thing's origin; `pivot: "foot"` puts each sprite's pivot on its drawn foot (`foot` in each
+  frame's data either way), and `pivot: "front"` places it at the front-most ground edge (useful for
+  long mounts and wagons sorting cleanly in y-sorted layers).
+- **Out to other tools, and reading external 3D references.** `export3d` writes `.vox`, `.obj`, `.glb`
+  and `.ply`; something that moves, as a function of the clock with `frames`, goes out as one `.glb`
+  that plays (and a file a moment for the others). `pxl serve` shows `.glb` meshes and `.ply` Gaussian
+  splats at `/3d`. `mesh()` draws a mesh in `surface()`'s side, top and iso views too. To study an
+  external 3D asset before recreating it in pxl, run `PXL shot` or `PXL study` on `.stl` (3D-printing
+  meshes, Z-up by default), `.glb`, `.obj`, or `.blend` files for orthographic turnarounds, symmetry/
+  watertight stats, and a 10-band silhouette profile; `PXL blender` converts `.blend` ↔ `.glb` or
+  renders posed headless Blender turnarounds.
 - **Into a diorama.** Things drawn in 3D stand among `mesh()`'s sprites when drawn after it through the
   same camera, in its light (`light: "mesh"`, what they take where they give none): its sun and sky on their tones (as on the sprites), the walls'
   and figures' shadows falling on them, their own shadows the sun's share, at its depth, in its

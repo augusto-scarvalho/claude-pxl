@@ -55,11 +55,17 @@ the top of the head to the soles.
 
 `PXL study ref.png` reads a reference for its palette and ramps, its outline (black, selective or
 none), its dithering and where its light comes from, at 1x even when it was posted enlarged or
-blurred; a GIF of an animation also for its timing and cycle; a sheet of many sprites apart (a
-game's ripped sheet) also for each sprite's size, by row: a figure's height in px, the frames of each
-move, the spacing, the colors a sprite gets (SHEET). It doesn't measure a figure's proportions
-inside it: for those, the steps below.
+blurred (`--px 1` forces native 1x); a GIF, video, or folder of PNG frames (`PXL study frames/ --px 1`)
+also gives timing and cycle; a sheet of many sprites apart (a game's ripped sheet) also gives each
+sprite's size, by row: a figure's height in px, the frames of each move, the spacing, the colors a
+sprite gets (SHEET). It doesn't measure a 2D figure's proportions inside it: for those, the steps below.
 
+- **3D references (`.stl`, `.glb`, `.obj`, `.blend`).** When starting from a 3D miniature, sculpt, or
+  mesh instead of a 2D sheet, run `PXL shot model.stl --dirs 5 --pitch 20` (`.stl` defaults to
+  `--up z`; pass `--up y` if tipped; `.blend` converts via headless Blender) for an orthographic
+  turnaround sheet, and `PXL study model.stl` for bounding W×D×H ratios, watertight/symmetry stats,
+  a 10-band height silhouette profile, and suggested pixel-art sprite sizes. `PXL blender` converts
+  `.blend` ↔ `.glb` or renders specific animation poses (`--frame N`, `--renders DIR`).
 - **Get a reference.** Use one finished sprite of the same size and view: ask the user, or use a
   free pack. Tiny Tactics, Puny Characters and Eldiran's sprites are CC0; the LPC bases and the SC
   iso charset are CC-BY-SA.
@@ -71,10 +77,12 @@ inside it: for those, the steps below.
   and heels. Save them as `{ name: [x, y, score] }` JSON and show them with
   `layer("pose", { ref: true }, pose("pose.json", { scale, x, y }))`.
 - **Read off the landmarks.** Import the reference with `sprite("ref", { png: "ref.png", palettize: true })`
-  and run `PXL ascii` on it (without `palettize`, colors off the palette print as `?`), or read the
-  image itself with `PXL describe ref.png`, which keys its own colors; `PXL compare ref.png` lists
-  each row's opaque extents and width. Note the rows of the chin, shoulders, waist, hands, knees and
-  soles, and the widths of the head and shoulders. Draw your silhouette on those rows.
+  and run `PXL ascii` on it (`--trim` crops to opaque bounds, `--anchor` numbers axes relative to the
+  pivot; without `palettize`, colors off the palette print as `?`), or read the image itself with
+  `PXL describe ref.png`, which keys its own colors; `PXL compare ref.png` lists each row's opaque
+  extents and width (`--anchor` aligns two assets by pivot automatically; `--pixels` shows a
+  pixel-by-pixel color diff). Note the rows of the chin, shoulders, waist, hands, knees and soles,
+  and the widths of the head and shoulders. Draw your silhouette on those rows.
 - **Take proportions, not costume.** Hair and clothes come from the character, not the reference.
   Hair tied in a bun hugs the skull, whatever volume the reference has.
 
@@ -174,13 +182,19 @@ directions walking, idle, kneeling and casting;
 2. **Blocks first** (`blocks: true`, `bk_<move>_<dir>`): the head yellow with a red patch where the
    face is, the body orange, the right limbs light and the left dark. Judge the proportions and the
    motion on a GIF of all the directions before painting anything.
-3. **Paint** (`parts`): each part fields along the bones (`j.limb`, `j.ball`), a torso, a tunic, a
-   coat or a cloak a surface swept round the upright (`j.sweep`: open in front, its lining, trailing
-   as he walks, flaring as he turns), drawn by `surface()` toned by how it faces the light (from
-   above and toward us: a mirrored view keeps it, §6); `ink` the line all round and on the part
-   behind (`inner: "dark"`: there the darkest tone of the part behind, so no near-black where a leg
-   meets the hips or a hem, the games' way, §7); `surface()` cleans what is drawn that small
-   (`clean`, on unless `false`: a pixel sticking out cut away, no line doubled, the outline whole).
+3. **Paint** (`parts`): each part fields along the bones (`j.limb`, `j.ball`, `j.union(pieces, { smooth, part })`
+   for smooth-blended groups), a torso, a tunic, a coat or a cloak a surface swept round the upright
+   (`j.sweep`: open in front, its lining, trailing as he walks, flaring as he turns), `j.rod` /
+   `j.smear` (with `{ behind, over }` depth overrides), drawn by `surface()` toned by how it faces the
+   light (from above and toward us: a mirrored view keeps it, §6; piece `paint(p, n, d, normal)` gets
+   the surface normal as its 4th arg); `ink` the line all round and on the part behind (`inner: "dark"`:
+   there the darkest tone of the part behind, so no near-black where a leg meets the hips or a hem, the
+   games' way, §7); `surface()` cleans what is drawn that small (`clean`, on unless `false`: a pixel
+   sticking out cut away, no line doubled, the outline whole). Per-move `w`, `h`, `pivot`, and
+   `headings` override the rig defaults so wide swings or 4-dir moves don't bloat every animation;
+   auto-sizing accounts for baked `views()` heads, and identical pose+heading renders are deduplicated
+   automatically. For depth-aware overlays (shields, mounted riders, held props), use `over: "depth"`
+   or `{ parts, mode: "pixel" }`; `rig3d.joints()` reads solved joints outside `parts`.
    What no primitive gives is a field of the file's own (`sdf.field`: the warden's axe head) or drawn
    by hand after the figure (`draw`). Give a sweep's radius, `keep` and `shift`, a field's distance
    and its paint functions as `pure({ ... }, fn)` (`PXL help pure`, Haldor's trunk and his paint,
@@ -197,18 +211,20 @@ directions walking, idle, kneeling and casting;
    beard, a hat or a bandana as fields in the head's frame) and drawn once per view by
    `views(name, field, { retouch })` (five views for 8 directions, the east the west's mirror; all of
    them under a light from one side); then its face painted over each view by hand (`retouch`: `"."`
-   keeps the render's pixel, `"_"` erases one): the eyes, the nose, the mouth, the brow, the cheek's
-   edge, cut from approved hand heads (§5); in profile the face a pixel wider than the hair leaves it
-   and the nose's tip past the line; turned away (sw, w), the cheek closed on a chin 3 px wide where
-   the render leaves the skull's shade under the ear (a jowl): `jowl: 2` closes it (the jaw's line in
-   the skin's dark up toward the ear), a side lock dark down to the jaw painted over it if the hair
-   comes down there; a bald crown the render lights as a blob of the skin's lightest: `crown: 3` keeps
-   its shine a dash 3 px long a pixel under the dome's top, the rest a step down, its sides another.
-   The 3D gets right the volumes hand drawing struggles with (the hair, a beard); a face of fields
-   and decals reads worse than a painted one, so the face is painted.
+   keeps the render's pixel, `"_"` erases one; `{ grid, on: "face" }` masks retouch strictly to one 3D
+   part so hair/helmets stay untouched; `false` skips a view): the eyes, the nose, the mouth, the brow,
+   the cheek's edge, cut from approved hand heads (§5); in profile the face a pixel wider than the hair
+   leaves it and the nose's tip past the line; turned away (sw, w), the cheek closed on a chin 3 px
+   wide where the render leaves the skull's shade under the ear (a jowl): `jowl: 2` closes it (the jaw's
+   line in the skin's dark up toward the ear), a side lock dark down to the jaw painted over it if the
+   hair comes down there; a bald crown the render lights as a blob of the skin's lightest: `crown: 3`
+   keeps its shine a dash 3 px long a pixel under the dome's top, the rest a step down, its sides
+   another. The 3D gets right the volumes hand drawing struggles with (the hair, a beard); a face of
+   fields and decals reads worse than a painted one, so the face is painted.
    `rig3d`'s `head` stamps it by the heading, as it would hand-drawn views (`views(name, { s: grid,
    sw, w, nw, n })`: front, front 3/4, profile, back 3/4, back, their crown, chin and anchor on the
-   same rows); drawn once per view, a head costs nothing per frame.
+   same rows); drawn once per view, a head costs nothing per frame. For ready modular HD-2D rigs and
+   mounted units to build on, see `lib/characters/kit.px.js` and `lib/characters/mounts.px.js`.
 5. **The walk by the view** (§6): facing us or away the feet lift in their own columns, in profile a
    long stride, on the diagonals between (`gait()`'s numbers). Seen from steeply above (a top-down game's
    45 degrees) a foot nearer us stands lower: `soles: true` puts every view's soles on one row.
@@ -248,8 +264,8 @@ it reads broken: a shin leaning far over a flat foot wants its heel up, or the k
 foot of before, under the figures drawn on it, isn't read: their stances, walks and kneels lean a shin
 25 to 105 degrees over it). The elbows bend by a hint, mostly down by default: an arm swung back bends forward with it, so a
 run or a side walk gives its poses `elbow: [-1, 0.5, 0]` (behind him), `[-1, 0.5, -1]` with a hand at or
-over the shoulder; an arm out level behind and one ahead want opposite hints, so keep a hand under the
-shoulder when the other swings (`lib/characters/hero.px.js`'s run).
+over the shoulder; when left and right arms need opposite bends, pass per-arm hints
+`elbow: [leftVec, rightVec]` (or `{ l, r }`; see `lib/characters/hero.px.js`'s run).
 
 What the first tries of the traveler (34 px) got wrong, and the fix:
 - A big head: 11 rows of 34, a third; 13 read as a big head on a small body.
@@ -276,10 +292,12 @@ straight hid what the blocks showed (in profile its side covers the legs): let i
 lie on the ground behind him.
 
 A pre-render from a 3D package (Blender, a CC0 mannequin made chibi, cel shading by blocks, the head
-drawn per frame) was tried on the traveler and dropped: the structure came out right, but the
-borrowed walk read stiff on a chibi, the turns were stuck at the angles rendered, and each proportion
-fix was a round trip through another program. Averaging a plain render down gives mud; reduce by
-blocks, a region per block and hard tone steps, if you go that way.
+drawn per frame) was tried on the traveler and dropped for animated rigs: the structure came out right,
+but the borrowed walk read stiff on a chibi, the turns were stuck at the angles rendered, and each
+proportion fix was a round trip through another program. Averaging a plain render down gives mud; reduce
+by blocks, a region per block and hard tone steps, if you go that way. When you *do* start from an
+existing `.blend` model as a reference (or export `pxl` 3D assets into Blender), `PXL blender` converts
+`.blend` ↔ `.glb` and renders orthographic turnarounds headlessly.
 
 ### Your own earlier version: its parts in your new colors
 
