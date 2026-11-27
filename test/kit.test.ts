@@ -43,10 +43,17 @@ test("kit race parts, rules, digitigrade legs, interior line mode, and visor/gem
     const okReptileFurs = kit.check({ head: "reptile", shoulders: "furs" })
     const okMinotaur = kit.check({ body: "large", head: "bull", digi: true, mane: "bull", tail: "bull", torso: "harness", legs: "breeches", feet: "hooves", belt: "belt" })
     const okWerewolf = kit.check({ body: "large", head: "werewolf", digi: true, tail: "wolf", mane: "wolf", hands: "wolf", torso: "harness", legs: "rolled", feet: "paws", belt: "belt" })
+    const okBear = kit.check({ body: "large", head: "bear", mane: "bear", tail: "bear", hands: "bear", torso: "tunic", legs: "rolled", feet: "paws", belt: "belt" })
+    const okBearStraw = kit.check({ body: "large", head: "bear", headwear: "straw", torso: "habit", feet: "paws" })
+    const okBearHood = kit.check({ body: "large", head: "bear", headwear: "hood", torso: "robe", feet: "paws" })
+    const okBearFurs = kit.check({ body: "large", head: "bear", shoulders: "furs", torso: "tunic", legs: "breeches", feet: "boots" })
+    const errBearFursMane = kit.check({ body: "large", head: "bear", mane: "bear", shoulders: "furs" })
+    const errBearGreathelm = kit.check({ body: "large", head: "bear", headwear: "greathelm" })
+    const okPanda = kit.check({ body: "large", head: "panda", mane: "bear", tail: "bear", hands: "bear", headwear: "circlet", outfit: "mage", feet: "paws" })
     const errHoofGreaves = kit.check({ feet: "hooves", shins: "greaves" })
     const errPawGreaves = kit.check({ feet: "paws", shins: "greaves" })
-    if (!errCrown || okCrown || !errHorns || okHorns || okSkullHood || okSkullHelm || okJackalope || okReptileFurs || okMinotaur || okWerewolf || !errHoofGreaves || !errPawGreaves) {
-      throw new Error("rule check mismatch: " + JSON.stringify({ errCrown, okCrown, errHorns, okHorns, okSkullHood, okSkullHelm, okJackalope, okReptileFurs, okMinotaur, okWerewolf, errHoofGreaves, errPawGreaves }))
+    if (!errCrown || okCrown || !errHorns || okHorns || okSkullHood || okSkullHelm || okJackalope || okReptileFurs || okMinotaur || okWerewolf || okBear || okBearStraw || okBearHood || okBearFurs || !errBearFursMane || !errBearGreathelm || okPanda || !errHoofGreaves || !errPawGreaves) {
+      throw new Error("rule check mismatch: " + JSON.stringify({ errCrown, okCrown, errHorns, okHorns, okSkullHood, okSkullHelm, okJackalope, okReptileFurs, okMinotaur, okWerewolf, okBear, okBearStraw, okBearHood, okBearFurs, errBearFursMane, errBearGreathelm, okPanda, errHoofGreaves, errPawGreaves }))
     }
     kit.character("elf", { ears: "pointed", hair: "loose", outfit: "ranger", dirs: ["sw"] })
     kit.character("catkin", { ears: "cat", tail: "cat", digi: true, outfit: "rogue", colors: { hair: "ginger", skin: "fair" }, dirs: ["sw"] })
@@ -58,6 +65,11 @@ test("kit race parts, rules, digitigrade legs, interior line mode, and visor/gem
     kit.character("frog_cleric", { body: "short", head: "frog", outfit: "cleric", off: "roundshield", colors: { scales: "frog" }, dirs: ["sw"] })
     kit.character("minotaur", { body: "large", head: "bull", digi: true, mane: "bull", tail: "bull", torso: "harness", legs: "breeches", feet: "hooves", belt: "belt", held: "axe", colors: { fur: "brown", horns: "ivory", torso: "black", feet: "black" }, dirs: ["sw"] })
     kit.character("werewolf", { body: "large", head: "werewolf", digi: true, tail: "wolf", mane: "wolf", hands: "wolf", outfit: "bare", torso: "harness", legs: "rolled", feet: "paws", belt: "belt", held: "axe", colors: { fur: "grey", torso: "black", feet: "black" }, dirs: ["sw"] })
+    kit.character("bearkin", { body: "large", head: "bear", face: "bearscar", mane: "bear", tail: "bear", hands: "bear", torso: "tunic", legs: "rolled", feet: "paws", belt: "belt", colors: { fur: "grizzly", torso: "olive", feet: "black" }, dirs: ["sw"] })
+    kit.character("polar_bear", { body: "large", head: "bear", tail: "bear", shoulders: "furs", torso: "tunic", legs: "breeches", feet: "boots", colors: { fur: "polar", shoulders: "whitefur", torso: "navy" }, dirs: ["sw"] })
+    kit.character("apiary_bear", { body: "large", head: "bear", mane: "bear", headwear: "straw", torso: "habit", feet: "paws", colors: { fur: "black", hat: "straw", torso: "olive" }, dirs: ["sw"] })
+    kit.character("cultist_bear", { body: "large", head: "bear", headwear: "hood", torso: "robe", feet: "paws", colors: { fur: "grizzly", hat: "canvas" }, dirs: ["sw"] })
+    kit.character("panda_bear", { body: "large", head: "panda", mane: "bear", tail: "bear", hands: "bear", outfit: "mage", feet: "paws", dirs: ["sw"] })
     kit.character("wolf_helm", { body: "beast", digi: true, headwear: "helmet", outfit: "manatarms", feet: "paws", dirs: ["sw"] })
     kit.character("satyr", { horns: "ram", digi: true, torso: "harness", legs: "rolled", feet: "hooves", belt: "belt", dirs: ["sw"] })
     kit.character("skel_pure", { head: "skull", outfit: "bare", held: "sword", off: "roundshield", dirs: ["sw"] })
@@ -68,7 +80,7 @@ test("kit race parts, rules, digitigrade legs, interior line mode, and visor/gem
     kit.character("darked", { outfit: "knight", line: "dark", dirs: ["sw"] })
   `, "kit-races.px.js");
 
-  for (const name of ["elf", "catkin", "harekin", "goblin", "tiefling", "jackalope", "lizard", "frog_cleric", "minotaur", "werewolf", "wolf_helm", "satyr", "skel_pure", "skel_helm", "bot", "mage", "inked", "darked"]) {
+  for (const name of ["elf", "catkin", "harekin", "goblin", "tiefling", "jackalope", "lizard", "frog_cleric", "minotaur", "werewolf", "bearkin", "polar_bear", "apiary_bear", "cultist_bear", "panda_bear", "wolf_helm", "satyr", "skel_pure", "skel_helm", "bot", "mage", "inked", "darked"]) {
     const img = p.image(`${name}_stand_sw`);
     assert.ok(img.w > 0 && img.h > 0 && img.bounds() !== null, `${name} should render non-empty pixels`);
   }
@@ -128,7 +140,7 @@ test("kit.swap() and kit.export() across atlas, per-dir and strips layouts with 
     const SPEC = { outfit: "knight", held: "sword", off: "roundshield", colors: { apron: "green", face: "red" } }
     const ALT = kit.swap(SPEC, { apron: "red", face: "navy" })
     kit.export("atlas_hero", SPEC, {
-      layout: "atlas", dirs: ["sw"], moves: ["idle", "slash"],
+      layout: "atlas", dirs: ["sw"], moves: ["idle", "walk", "run", "slash"],
       format: "grid", pad: 1, extrude: 1, scale: 2,
       aliases: { moves: { slash: "attack" }, dirs: { sw: "down_left" }, sockets: { head_top: "ui_top" } },
       slots: { alt: ALT },
@@ -154,6 +166,11 @@ test("kit.swap() and kit.export() across atlas, per-dir and strips layouts with 
     assert.equal(a.extrude, 2);
     assert.deepEqual(a.meta.dirs, ["down_left"]);
     assert.equal(a.meta.moves.idle.loop, true);
+    assert.equal(a.meta.moves.walk.loop, true);
+    assert.equal(a.meta.moves.walk.frames, 8);
+    assert.equal(a.meta.moves.run.loop, true);
+    assert.equal(a.meta.moves.run.frames, 8);
+    assert.ok(a.meta.moves.run.pace.down_left > a.meta.moves.walk.pace.down_left, "run pace should exceed walk pace");
     assert.equal(a.meta.moves.attack.source, "slash");
     assert.equal(a.meta.moves.attack.loop, false);
     assert.ok(a.meta.sockets.includes("ui_top"));
@@ -208,6 +225,8 @@ test("kit characters with cloaks, robes, wings and straps trace with zero non-pu
   const p = loadArt(INC + `
     kit.character("pure_knight", { outfit: "knight", cloak: "travel", held: "sword", off: "tallshield", dirs: ["sw", "w"], moves: ["stand"] })
     kit.character("pure_mage", { outfit: "mage", back: "wings", headwear: "pointed", held: "magestaff", dirs: ["sw"], moves: ["stand"] })
+    kit.character("pure_bear", { body: "large", head: "bear", mane: "bear", tail: "bear", hands: "bear", headwear: "hood", torso: "tunic", legs: "rolled", feet: "paws", belt: "belt", dirs: ["sw"], moves: ["stand"] })
+    kit.character("pure_panda", { body: "large", head: "panda", mane: "bear", tail: "bear", hands: "bear", outfit: "mage", feet: "paws", dirs: ["sw"], moves: ["stand"] })
   `, "kit-pure.px.js");
   const prevOn = kept.on, prevLeft = kept.left;
   const impure: string[] = [];
@@ -217,6 +236,8 @@ test("kit characters with cloaks, robes, wings and straps trace with zero non-pu
     p.image("pure_knight_stand_sw");
     p.image("pure_knight_stand_w");
     p.image("pure_mage_stand_sw");
+    p.image("pure_bear_stand_sw");
+    p.image("pure_panda_stand_sw");
   } finally {
     kept.on = prevOn;
     kept.left = prevLeft;

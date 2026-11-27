@@ -142,6 +142,8 @@ const RACES = {
   ramkin: { body: "short", horns: "ram", digi: true, feet: "hooves", beard: "full", outfit: "barbarian", colors: { horns: "bone", hair: "dark", feet: "black" } },
   bullkin: { body: "large", head: "bull", digi: true, mane: "bull", tail: "bull", torso: "harness", legs: "breeches", feet: "hooves", belt: "belt", arms: "bracers", colors: { fur: "brown", horns: "ivory", torso: "black", legs: "tweed", feet: "black" } },
   werewolf: { body: "large", head: "werewolf", digi: true, tail: "wolf", mane: "wolf", hands: "wolf", outfit: "bare", torso: "harness", legs: "rolled", feet: "paws", belt: "belt", arms: "bracers", colors: { fur: "grey", torso: "black", legs: "slate", feet: "black" } },
+  bearkin: { body: "large", head: "bear", mane: "bear", tail: "bear", hands: "bear", torso: "tunic", legs: "rolled", feet: "paws", belt: "belt", back: "pack", colors: { fur: "grizzly", torso: "olive", legs: "brown", feet: "black", pack: "brown" } },
+  pandakin: { body: "large", head: "panda", mane: "bear", tail: "bear", hands: "bear", outfit: "mage", feet: "paws", held: "magestaff", colors: { torso: "red", trim: "linen", belt: "brown", feet: "black" } },
   stagkin: { horns: "antlers", hair: "longback", back: "wings", outfit: "cleric", colors: { horns: "bone", wings: "white", hair: "auburn" } },
   reptile: { head: "reptile", tail: "reptile", digi: true, outfit: "barbarian", colors: { scales: "emerald", eyes: "amber" } },
   frog: { body: "short", head: "frog", outfit: "cleric", off: "roundshield", colors: { scales: "frog" } },
